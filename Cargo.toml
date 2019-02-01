@@ -1,0 +1,8 @@
+[package]
+name = "rustboy"
+version = "0.1.0"
+authors = ["zylonenoger <zylonenoger@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sdl2 = "0.32.1"
