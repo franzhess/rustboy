@@ -1,19 +1,22 @@
-mod cpu;
-mod hardware;
+extern crate rustboy;
 
-use hardware::init_hardware;
-use std::time::*;
+use rustboy::hardware::init_hardware;
+use rustboy::cpu::CPU;
+
+use std::fs;
+use std::io::Read;
 
 fn main() {
-    let (mut input, mut display) = init_hardware(160, 144);
+  let (mut input, _display) = init_hardware(160, 144);
 
-    let mut cpu = cpu::Cpu::new();
+  let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
 
-    while let Ok(input_state) = input.process_input() {
-        let tick_result = cpu.tick();
+  let mut f = fs::File::open("roms/Tetris.gb").unwrap();
+  f.read(&mut buffer).unwrap();
 
-        if tick_result.screen_changed {
-            display.draw_screen(cpu.get_screen_buffer_ref());
-        }
-    }
+  let mut cpu = CPU::new(buffer);
+
+  while let Ok(input_state) = input.process_input() {
+    cpu.tick(input_state);
+  }
 }
