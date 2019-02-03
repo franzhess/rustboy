@@ -1,9 +1,9 @@
 #[derive(Debug, Copy, Clone)]
 pub enum CpuFlag {
-  Z = 0b10000000,
-  N = 0b01000000,
-  H = 0b00100000,
-  C = 0b00010000
+  Z = 0b10000000, //zero
+  N = 0b01000000, //subtract
+  H = 0b00100000, //half carry
+  C = 0b00010000 //carry
 }
 
 #[derive(Debug, Copy, Clone)]

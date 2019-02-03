@@ -1,7 +1,8 @@
-extern crate rustboy;
+mod hardware;
+mod cpu;
 
-use rustboy::hardware::init_hardware;
-use rustboy::cpu::CPU;
+use hardware::init_hardware;
+use cpu::CPU;
 
 use std::fs;
 use std::io::Read;

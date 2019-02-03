@@ -4,8 +4,8 @@ use sdl2::render::Canvas;
 use sdl2::Sdl;
 use sdl2::video::Window;
 
-use crate::cpu::SCREEN_BUFFER_HEIGHT;
-use crate::cpu::SCREEN_BUFFER_WIDTH;
+use crate::cpu::mmu::gpu::SCREEN_HEIGHT;
+use crate::cpu::mmu::gpu::SCREEN_WIDTH;
 
 pub struct Display {
   canvas: Canvas<Window>,
@@ -21,7 +21,7 @@ impl Display {
       .expect("Failed to create the main window!");
 
     let mut canvas = window.into_canvas().build().expect("Failed to place a canvas in the window!");
-    canvas.set_logical_size(SCREEN_BUFFER_WIDTH as u32, SCREEN_BUFFER_HEIGHT as u32).expect("Failed to set the logical size of the canvas!");
+    canvas.set_logical_size(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32).expect("Failed to set the logical size of the canvas!");
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
@@ -32,7 +32,7 @@ impl Display {
     }
   }
 
-  pub fn draw_screen(&mut self, screen_buffer: &[[u8; SCREEN_BUFFER_WIDTH]; SCREEN_BUFFER_HEIGHT]) {
+  pub fn draw_screen(&mut self, screen_buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {
     self.canvas.set_draw_color(Color::RGB(0, 0, 0));
     self.canvas.clear();
 
@@ -49,6 +49,9 @@ impl Display {
 
 fn map_color(color: u8) -> Color {
   match color {
-    _ => Color::RGB(255, 255, 255)
+    0 => Color::RGB( 0x00, 0x00, 0x00),
+    1 => Color::RGB( 0x67, 0x67, 0x67),
+    2 => Color::RGB( 0xB6, 0xB6, 0xB6),
+    _ => Color::RGB( 0xFF, 0xFF, 0xFF)
   }
 }
