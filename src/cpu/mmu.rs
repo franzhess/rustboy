@@ -3,6 +3,7 @@ pub mod gpu;
 
 use std::str;
 use crate::cpu::mmu::gpu::GPU;
+use crate::cpu::mmu::gpu::VOAM_SIZE;
 
 const ADDR_TITLE_START: usize = 0x0134;
 const ADDR_TITLE_END: usize = 0x0142;
@@ -10,7 +11,9 @@ const ADDR_CARTRIDGE_TYPE: usize = 0x0147;
 
 pub struct MMU {
   buffer: [u8; 0xFFFF],
-  gpu: GPU
+  gpu: GPU,
+  interrupt_enable: u8,
+  interrupt_request: u8,
 }
 
 impl MMU {
@@ -29,7 +32,9 @@ impl MMU {
 
     MMU {
       buffer,
-      gpu: GPU::new()
+      gpu: GPU::new(),
+      interrupt_enable: 0,
+      interrupt_request: 0
     }
   }
 
@@ -37,7 +42,10 @@ impl MMU {
     match address {
       0x8000 ... 0x9FFF => self.gpu.read_byte(address),
       0xFE00 ... 0xFE9F => self.gpu.read_byte(address),
+      0xFF0F => self.interrupt_request,
+      0xFF46 => 0,
       0xFF40 ... 0xFF4B => self.gpu.read_byte(address),
+      0xFFFF => self.interrupt_enable,
       _ => self.buffer[address as usize]
     }
   }
@@ -50,9 +58,41 @@ impl MMU {
     match address {
       0x8000 ... 0x9FFF => self.gpu.write_byte(address, value),
       0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value),
+      0xFF0F => self.interrupt_request = value,
+      0xFF46 => self.copy_to_voam(value),
       0xFF40 ... 0xFF4B => self.gpu.write_byte(address, value),
-      0xFFFF => println!("writing to interrupt enable"),
+      0xFFFF => self.interrupt_enable = value,
       _ => self.buffer[address as usize] = value
+    }
+  }
+
+  pub fn write_word(&mut self, address: u16, value: u16) {
+    self.write_byte(address, (value & 0x00FF) as u8); //LSB first
+    self.write_byte(address + 1, ((value & 0xFF00) >> 8) as u8);
+  }
+
+  pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
+    &self.gpu.screen_buffer
+  }
+
+  pub fn do_ticks(&mut self, ticks: usize) {
+    if self.gpu.irq_vblank {
+      self.interrupt_request |= 0x01;
+    }
+
+    if self.gpu.irq_stat {
+      self.interrupt_request |= 0x02;
+    }
+
+    //@TODO do timer stuff
+
+    self.gpu.do_ticks(ticks);
+  }
+
+  fn copy_to_voam(&mut self, value: u8) {
+    let mem_start = (value as u16) << 8;
+    for offset in 0..VOAM_SIZE {
+      self.gpu.write_byte(0xFE00 + offset as u16, self.read_byte(mem_start + offset as u16));
     }
   }
 }

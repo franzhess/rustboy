@@ -53,15 +53,15 @@ impl Registers {
   }
 
   pub fn get_hli(&mut self) -> u16 {
-    let res = self.get_hl();
-    self.set_hl(res + 1);
-    res
+    let hl = self.get_hl();
+    self.set_hl(hl.wrapping_add(1));
+    hl
   }
 
   pub fn get_hld(&mut self) -> u16 {
-    let res = self.get_hl();
-    self.set_hl(res - 1);
-    res
+    let hl = self.get_hl();
+    self.set_hl(hl.wrapping_sub(1));
+    hl
   }
 
   pub fn set_af(&mut self, w: u16) {
@@ -95,6 +95,7 @@ impl Registers {
     self.f &= 0xF0; // the lower bits are always 0
   }
 
+  //if you have to clear more than one flag, this way is more efficient
   pub fn reset_flags(&mut self) {
     self.f = 0x00;
   }
