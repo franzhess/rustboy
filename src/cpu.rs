@@ -75,38 +75,62 @@ impl CPU {
       0x05 => { self.registers.b = self.alu_dec(self.registers.b); 4 }, //DEC B
       0x06 => { self.registers.b = self.fetch_byte(); 8 }, //LD B, n
       0x07 => { self.registers.a = self.alu_rlc(self.registers.a); 4 }, //RLCA - rotate left a
+      0x08 => { let address = self.fetch_word(); self.mmu.write_word(address, self.registers.sp); 20 }, //LD (nn),SP
+      0x09 => { self.alu_add16(self.registers.get_bc()); 8 }, //ADD HL,BC
+      0x0A => { self.registers.a = self.mmu.read_byte(self.registers.get_bc()); 8 }, //LD A,(BC)
       0x0B => { self.registers.set_bc(self.registers.get_bc().wrapping_sub(1)); 8 }, //DEC BC - no flags set
       0x0C => { self.registers.c = self.alu_inc(self.registers.c); 4 }, //INC C
       0x0D => { self.registers.c = self.alu_dec(self.registers.c); 4}, //DEC C
       0x0E => { self.registers.c = self.fetch_byte(); 8 }, //LD C, n
+      0x0F => { self.registers.a = self.alu_rrc(self.registers.a); 4 }, //RRCA
+      0x10 => { self.halted = true; 4 }, //STOP @TODO implement
       0x11 => { let next_word = self.fetch_word(); self.registers.set_de(next_word); 12 }, //LD DE,nn
       0x12 => { self.mmu.write_byte(self.registers.get_de(), self.registers.a); 8 }, //LD (DE),A
       0x13 => { self.registers.set_de(self.registers.get_de().wrapping_add(1)); 8 }, //INC DE
+      0x14 => { self.registers.d = self.alu_inc(self.registers.d); 4}, //INC D
+      0x15 => { self.registers.d = self.alu_dec(self.registers.d); 4}, //DEC D
+      0x16 => { self.registers.d = self.fetch_byte(); 8 }, //LD D,n
       0x17 => { self.registers.a = self.alu_rl(self.registers.a); 4 }, //RLA - rotate left through carry
       0x18 => { self.jump_r(); 12 }, //JR n
+      0x19 => { self.alu_add16(self.registers.get_de()); 8 }, //ADD HL,DE
       0x1A => { self.registers.a = self.mmu.read_byte(self.registers.get_de()); 8 }, //LD A,(DE)
-      0x1C => { self.registers.e = self.alu_inc(self.registers.e); 4 }, //INC C
+      0x1B => { self.registers.set_de(self.registers.get_de().wrapping_sub(1)); 8 }, //DEC DE - no flags set
+      0x1C => { self.registers.e = self.alu_inc(self.registers.e); 4 }, //INC E
+      0x1D => { self.registers.e = self.alu_dec(self.registers.e); 4}, //DEC E
+      0x1E => { self.registers.e = self.fetch_byte(); 8 }, //LD E,n
+      0x1F => { self.registers.a = self.alu_rr(self.registers.a); 4 }, //RRA
       0x20 => { if !self.registers.get_flag(CpuFlag::Z) { self.jump_r(); } else { self.registers.pc += 1; }; 8 }, //JR NZ, n
       0x21 => { let next_word = self.fetch_word(); self.registers.set_hl(next_word); 12 }, //LD HL,nn
       0x22 => { self.mmu.write_byte(self.registers.get_hli(), self.registers.a); 12 }, //LD (HL+),A
       0x23 => { self.registers.set_hl(self.registers.get_hl().wrapping_add(1)); 8 }, //INC HL
+      0x24 => { self.registers.h = self.alu_inc(self.registers.h); 4}, //INC H
+      0x25 => { self.registers.h = self.alu_dec(self.registers.h); 4}, //DEC H
+      0x26 => { self.registers.h = self.fetch_byte(); 8 }, //LD H,n
       0x27 => { self.alu_daa(); 4 }, //DAA
       0x28 => { if self.registers.get_flag(CpuFlag::Z) { self.jump_r(); } else { self.registers.pc += 1; }; 8 }, //JR Z, n
+      0x29 => { self.alu_add16(self.registers.get_hl()); 8 }, //ADD HL,HL
       0x2A => { self.registers.a = self.mmu.read_byte(self.registers.get_hli()); 8 }, //LD A,(HL+)
+      0x2B => { self.registers.set_hl(self.registers.get_hl().wrapping_sub(1)); 8 }, //DEC HL - no flags set
       0x2C => { self.registers.l = self.alu_inc(self.registers.l); 4 }, //INC L
+      0x2D => { self.registers.l = self.alu_dec(self.registers.l); 4}, //DEC L
+      0x2E => { self.registers.l = self.fetch_byte(); 8 }, //LD L,n
       0x2F => { self.alu_cpl(); 4 } //CPL - A=A XOR FF - method for flags
       0x30 => { if !self.registers.get_flag(CpuFlag::C) { self.jump_r(); 12 } else { self.registers.pc += 1; 8} }, //JR NC, n
       0x31 => { self.registers.sp = self.fetch_word(); 12 }, //LD SP,d16
       0x32 => { self.mmu.write_byte(self.registers.get_hld(), self.registers.a); 8 }, //LD (HL-), A
+
       0x34 => { let inc_byte = self.alu_inc(self.mmu.read_byte(self.registers.get_hl())); self.mmu.write_byte(self.registers.get_hl(), inc_byte); 12 }, //INC (HL)
       0x35 => { let dec_byte = self.alu_dec(self.mmu.read_byte(self.registers.get_hl())); self.mmu.write_byte(self.registers.get_hl(), dec_byte); 12 } //DEC (HL)
       0x36 => { let next_byte = self.fetch_byte(); self.mmu.write_byte(self.registers.get_hl(), next_byte); 12 }, //LD (HL),n
+
       0x38 => { if self.registers.get_flag(CpuFlag::C) { self.jump_r(); 12 } else { self.registers.pc += 1; 8 } }, //JR C, n
       0x39 => { self.alu_add16(self.registers.sp); 8 } //ADD HL,SP
       0x3A => { self.registers.a = self.mmu.read_byte(self.registers.get_hld()); 8 }, //LD A,(HL-)
+      0x3B => { self.registers.sp = self.registers.sp.wrapping_sub(1); 8 }, //DEC SP - no flags set
       0x3C => { self.registers.a = self.alu_inc(self.registers.a); 4 }, //INC A
       0x3D => { self.registers.a = self.alu_dec(self.registers.a); 4 }, //DEC A
       0x3E => { self.registers.a = self.fetch_byte(); 8 }, //LD A,#
+      0x3F => { self.alu_ccf();  4 }, //CCF - flip carry
       0x40 => { self.registers.b = self.registers.b; 4 }, //LD B,B
       0x41 => { self.registers.b = self.registers.c; 4 }, //LD B,C
       0x42 => { self.registers.b = self.registers.d; 4 }, //LD B,D
@@ -139,7 +163,14 @@ impl CPU {
       0x5D => { self.registers.e = self.registers.l; 4 }, //LD E,L
       0x5E => { self.registers.e = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD E,(HL)
       0x5F => { self.registers.e = self.registers.a; 4 }, //LD E,A
+
+
+
       0x67 => { self.registers.h = self.registers.a; 4 }, //LD H,A
+
+
+
+
       0x6E => { self.registers.l = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD L,(HL)
       0x6F => { self.registers.l = self.registers.a; 4 }, //LD L,A
       0x70 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.b); 8 }, //LD (HL),B
@@ -198,39 +229,58 @@ impl CPU {
       0xB5 => { self.alu_or(self.registers.l); 4 }, //OR L
       0xB6 => { self.alu_or(self.mmu.read_byte(self.registers.get_hl())); 8 }, //OR (HL)
       0xB7 => { self.alu_or(self.registers.a); 4 }, //OR A
+
       0xBB => { self.alu_cp(self.registers.e); 4 }, //CP E
+
       0xC0 => { if !self.registers.get_flag(CpuFlag::Z) { self.retrn(); 20 } else { 8 } }, //RET NZ
       0xC1 => { let bc = self.pop(); self.registers.set_bc(bc); 12 }, //POP BC
+
       0xC3 => { self.registers.pc = self.fetch_word(); 12 }, //JUMP nn
       0xC4 => { self.registers.c = self.registers.h; 4 }, //LD C,H
       0xC5 => { self.push(self.registers.get_bc()); 16 } //PUSH BC
+
+
       0xC8 => { if self.registers.get_flag(CpuFlag::Z) { self.retrn(); 20 } else { 8 } }, //RET Z
       0xC9 => { self.retrn(); 16 }, //RET
       0xCA => { if self.registers.get_flag(CpuFlag::Z) { self.registers.pc = self.fetch_word(); 16 } else { self.registers.pc += 2; 12 } }, //JP Z,nn
+      0xCB => { self.op_code_cb() + 4 }, //CB
       0xCC => { if self.registers.get_flag(CpuFlag::Z) { let address = self.fetch_word(); self.call(address); 24 } else { self.registers.pc += 2; 12 } }, //CALL Z,nn
       0xCD => { let address = self.fetch_word(); self.call(address); 24 }, //CALL a16
-      0xCB => { self.op_code_cb() + 4 }, //CB
+
+
       0xD1 => { let de = self.pop(); self.registers.set_de(de); 12 } //POP DE
+
       0xD5 => { self.push(self.registers.get_de()); 16 }, //PUSH DE
+
       0xD8 => { self.alu_adc(self.registers.l); 4 }, //ADC A,L
       0xD9 => { self.ime = true; self.retrn(); 16 }, //RETI (return and enable interrupts)
       0xDA => { if self.registers.get_flag(CpuFlag::C) { self.registers.pc = self.fetch_word(); 16 } else { self.registers.pc += 2; 12 } }, //JP C,nn
+
       0xE0 => { let address = 0xFF00 + self.fetch_byte() as u16; self.mmu.write_byte(address, self.registers.a); 12 }, //LDH (n),
       0xE1 => { let hl = self.pop(); self.registers.set_hl(hl); 12 } //POP HL
       0xE2 => { self.mmu.write_byte(0xFF00 + self.registers.c as u16, self.registers.a);  8 }, //LD (C),A
+
+
       0xE5 => { self.push(self.registers.get_hl()); 16 } //PUSH HL
       0xE6 => { let next_byte = self.fetch_byte(); self.alu_and(next_byte); 8 } //AND n
+
       0xEA => { let address = self.fetch_word(); self.mmu.write_byte(address, self.registers.a); 16 }, //LD (nn),A
+
       0xF0 => { let address = 0xFF00 + self.fetch_byte() as u16; self.registers.a = self.mmu.read_byte(address); 12 }, //LDH A,(n)
       0xF1 => { let af = self.pop(); self.registers.set_af(af); 12 } //POP AF
+
       0xF3 => { self.ime = false; 4 }, //DI disable interrupts
+
       0xF5 => { self.push(self.registers.get_af()); 16 }, //PUSH AF
+
       0xF8 => { let value = self.alu_add_next_signed_byte_to_word(self.registers.sp); self.registers.set_hl(value); 12 }, //LD HL, SP+r8
+
       0xFA => { let address = self.fetch_word(); self.registers.a = self.mmu.read_byte(address); 16 }, //LD A,(nn)
       0xFB => { self.ime = true; 4 }, //EI enable interrupts
+
       0xFE => { let next_byte = self.fetch_byte(); self.alu_cp(next_byte); 8 }, //CP A,n  compare a-n
       0xFF => { self.call(0x0038); 16 }, //RST 0x0038
-      _ => { panic!("Unknown command {:#04X} at {:#06X}", op_code, self.registers.pc - 1); }
+      _ => { println!("Unknown command {:#04X} at {:#06X}", op_code, current_address); self.halted = true; 4 }
     }
   }
 
@@ -404,28 +454,28 @@ impl CPU {
 
   fn alu_rl(&mut self, value: u8) -> u8 { //rotate left through carry
     let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
-    let result = (value < 1) | if self.registers.get_flag(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the carry to the right
+    let result = (value << 1) | if self.registers.get_flag(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the carry to the right
     self.alu_shift_operation_flag_update(result, new_carry);
     result
   }
 
   fn alu_rlc(&mut self, value: u8) -> u8 { //rotate left
     let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
-    let result = (value < 1) | if new_carry(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the pushed out bit to the right
+    let result = (value << 1) | if new_carry { 0x01 } else { 0x00 }; //push one to the left and add the pushed out bit to the right
     self.alu_shift_operation_flag_update(result, new_carry);
     result
   }
 
   fn alu_rr(&mut self, value: u8) -> u8 { //rotate right through carry
     let new_carry = (value & 0x01) == 0x01;
-    let result = (value > 1) | if self.registers.get_flag(CpuFlag::C) { 0x80 } else { 0x00 };
+    let result = (value >> 1) | if self.registers.get_flag(CpuFlag::C) { 0x80 } else { 0x00 };
     self.alu_shift_operation_flag_update(result, new_carry);
     result
   }
 
   fn alu_rrc(&mut self, value: u8) -> u8 { //rotate right
     let new_carry = (value & 0x01) == 0x01;
-    let result = (value > 1) | if new_carry { 0x80 } else { 0x00 };
+    let result = (value >> 1) | if new_carry { 0x80 } else { 0x00 };
     self.alu_shift_operation_flag_update(result, new_carry);
     result
   }
@@ -450,6 +500,18 @@ impl CPU {
     let result = value >> 1;
     self.alu_shift_operation_flag_update(result, new_carry);
     result
+  }
+
+  fn alu_ccf(&mut self) {
+    self.registers.set_flag(CpuFlag::N, false);
+    self.registers.set_flag(CpuFlag::H, false);
+    self.registers.set_flag(CpuFlag::C, self.registers.get_flag(CpuFlag::C));
+  }
+
+  fn alu_scf(&mut self) {
+    self.registers.set_flag(CpuFlag::N, false);
+    self.registers.set_flag(CpuFlag::H, false);
+    self.registers.set_flag(CpuFlag::C, true);
   }
 
   fn jump_r(&mut self) {

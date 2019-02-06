@@ -128,6 +128,7 @@ impl GPU {
       0xFF42 => self.scroll_y = value,
       0xFF43 => self.scroll_x = value,
       0xFF45 => self.line_compare = value,
+      0xFF44 => self.line = 0,
       0xFF47 => self.bg_palette = value,
       0xFF48 => self.obj_palette_1 = value,
       0xFF49 => self.obj_palette_2 = value,
@@ -200,7 +201,9 @@ impl GPU {
 
   fn render_frame(&mut self) {
     self.render_background();
-    self.render_sprites();
+    if self.sprite_enable {
+      self.render_sprites();
+    }
   }
 
   fn render_background(&mut self) {
@@ -238,12 +241,10 @@ impl GPU {
   }
 
   fn render_sprites(&mut self) {
-    if self.sprite_enable {
       for sprite_num in 0..40 {
         let sprite_address = 0xFE00u16 + (39 - sprite_num) * 4;
         println!("rendering sprite: {:#06X}", sprite_address);
       }
-    }
   }
 
   fn sprite_row(first: u8, second: u8) -> [u8;8] {
@@ -254,5 +255,29 @@ impl GPU {
       result[i] = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
     }
     result
+  }
+}
+
+#[cfg(test)]
+mod test
+{
+  use super::*;
+
+  #[test]
+  fn sprite_rows_to_color_values()
+  {
+    let first =  0b01010101;
+    let second = 0b11000011;
+
+    let result = GPU::sprite_row(first, second);
+
+    assert_eq!(result[0],  2);
+    assert_eq!(result[1],  3);
+    assert_eq!(result[2],  0);
+    assert_eq!(result[3],  1);
+    assert_eq!(result[4],  0);
+    assert_eq!(result[5],  1);
+    assert_eq!(result[6],  2);
+    assert_eq!(result[7],  3);
   }
 }
