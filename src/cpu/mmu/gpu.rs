@@ -15,7 +15,7 @@ pub struct GPU {
   lcd_enabled: bool, //FF40
   window_tilemap_select: bool, //FF40 - false = 9800-9BFF / true = 9C00-9FFF
   window_enable: bool, //FF40
-  bg_window_tile_data_select: bool, //FF40 - false = 8800-97FF / true = 8000-8FFF
+  bg_window_tile_addressing: bool, //FF40 - false = 8800-97FF / true = 8000-8FFF
   bg_tilemap_select: bool, //FF40 false = 9800-9BFF / true = 9C00-9FFF
   sprite_size: bool, //FF40 false = 8x8 / true = 8x16
   sprite_enable: bool, //FF40
@@ -48,7 +48,7 @@ impl GPU {
       lcd_enabled: false,
       window_tilemap_select: false,
       window_enable: false,
-      bg_window_tile_data_select: false,
+      bg_window_tile_addressing: false,
       bg_tilemap_select: false,
       sprite_size: false,
       sprite_enable: false,
@@ -78,7 +78,7 @@ impl GPU {
         (if self.lcd_enabled { 0x80 } else { 0x00 }) |
         (if self.window_tilemap_select { 0x40 } else { 0x00 }) |
         (if self.window_enable { 0x20 } else { 0x00 }) |
-        (if self.bg_window_tile_data_select { 0x10 } else { 0x00 }) |
+        (if self.bg_window_tile_addressing { 0x10 } else { 0x00 }) |
         (if self.bg_tilemap_select { 0x08 } else { 0x00 }) |
         (if self.sprite_size { 0x04 } else { 0x00 }) |
         (if self.sprite_enable { 0x02 } else { 0x00 }) |
@@ -113,7 +113,7 @@ impl GPU {
         self.lcd_enabled = value & 0x80 == 0x80;
         self.window_tilemap_select = value & 0x40 == 0x40;
         self.window_enable = value & 0x20 == 0x20;
-        self.bg_window_tile_data_select = value & 0x10 == 0x10;
+        self.bg_window_tile_addressing = value & 0x10 == 0x10;
         self.bg_tilemap_select = value & 0x08 == 0x08;
         self.sprite_size = value & 0x04 == 0x04;
         self.sprite_enable = value & 0x02 == 0x02;
@@ -150,7 +150,7 @@ impl GPU {
 
       while self.clock >= 456 { //advance one line
         self.clock -= 456;
-        self.line = (self.line + 1) % 154;
+        self.line = (self.line + 1) % 154; //154 = 144 physical lines + 10 imaginary vblank lines
 
         if self.line > 144 && self.mode != 1 {
           self.set_mode(1);
@@ -199,26 +199,60 @@ impl GPU {
   }
 
   fn render_frame(&mut self) {
-    for x in 0..SCREEN_WIDTH {
-      for y in 0..SCREEN_HEIGHT {
-        self.screen_buffer[y][x] = ((x + y) % 4) as u8;
-      }
-    }
-
     self.render_background();
     self.render_sprites();
   }
 
   fn render_background(&mut self) {
+    let tile_map_address = if self.bg_tilemap_select { 0x9C00u16 } else { 0x9800u16 };
 
+    let mut db = [[0u8; 256]; 256];
+
+    for y in 0..32 {
+      for x in 0..32 {
+        let tile_address = if self.bg_window_tile_addressing {
+          0x8000u16 + self.read_byte(tile_map_address + (x + y * 32) as u16) as u16
+        } else {
+          0x9000u16.wrapping_add(self.read_byte(tile_map_address + (x + y * 32) as u16) as i8 as i16 as u16)
+        };
+
+        for row in 0..8 {
+          let row_address = tile_address + row * 2;
+          let first = self.read_byte(row_address);
+          let second = self.read_byte(row_address + 1);
+
+          let colors = GPU::sprite_row(first, second);
+          for (i, value) in colors.iter().enumerate() {
+            db[y * 8 + row as usize][x * 8 + i] = *value;
+          }
+        }
+      }
+    }
+
+    for x in 0..SCREEN_WIDTH {
+      for y in 0..SCREEN_HEIGHT {
+        self.screen_buffer[y][x] = db[y][x];
+        //self.screen_buffer[y][x] = ((x + y) % 4) as u8;
+      }
+    }
   }
 
   fn render_sprites(&mut self) {
     if self.sprite_enable {
       for sprite_num in 0..40 {
         let sprite_address = 0xFE00u16 + (39 - sprite_num) * 4;
-        println!("{:#06X}", sprite_address);
+        println!("rendering sprite: {:#06X}", sprite_address);
       }
     }
+  }
+
+  fn sprite_row(first: u8, second: u8) -> [u8;8] {
+    //println!("{:#06X} {:#06X}", first, second);
+    let mut result = [0u8; 8];
+    for i in 0 .. 8 {
+      let bit_index = 7 - i; // bit 7 left most bit 0 right most
+      result[i] = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
+    }
+    result
   }
 }
