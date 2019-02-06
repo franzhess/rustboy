@@ -38,9 +38,6 @@ impl CPU {
             Bit 2: Timer    Interrupt Request (INT 50h)  (1=Request)
             Bit 3: Serial   Interrupt Request (INT 58h)  (1=Request)
             Bit 4: Joypad */
-
-
-
         }
       }
 
@@ -67,25 +64,31 @@ impl CPU {
     let current_address = self.registers.pc;
     let op_code = self.fetch_byte();
 
-    println!("do_cycle: {:#04X} @ {:#06X}", op_code, current_address);
+    //println!("do_cycle: {:#04X} @ {:#06X}", op_code, current_address);
 
     match op_code {
       0x00 => 4, //NOOP
       0x01 => { let next_word = self.fetch_word(); self.registers.set_bc(next_word); 12 }, //LD BC, d16
       0x02 => { self.mmu.write_byte(self.registers.get_bc(), self.registers.a); 8 }, //LD (BC),A
+      0x03 => { self.registers.set_bc(self.registers.get_bc().wrapping_add(1)); 8 }, //INC BC
+      0x04 => { self.registers.b = self.alu_inc(self.registers.b); 4 }, //INC B
       0x05 => { self.registers.b = self.alu_dec(self.registers.b); 4 }, //DEC B
       0x06 => { self.registers.b = self.fetch_byte(); 8 }, //LD B, n
-      0x0B => { let dec = self.registers.get_bc().wrapping_sub(1); self.registers.set_bc(dec); 8 }, //DEC BC - no flags set
+      0x07 => { self.registers.a = self.alu_rlc(self.registers.a); 4 }, //RLCA - rotate left a
+      0x0B => { self.registers.set_bc(self.registers.get_bc().wrapping_sub(1)); 8 }, //DEC BC - no flags set
       0x0C => { self.registers.c = self.alu_inc(self.registers.c); 4 }, //INC C
       0x0D => { self.registers.c = self.alu_dec(self.registers.c); 4}, //DEC C
       0x0E => { self.registers.c = self.fetch_byte(); 8 }, //LD C, n
       0x11 => { let next_word = self.fetch_word(); self.registers.set_de(next_word); 12 }, //LD DE,nn
       0x12 => { self.mmu.write_byte(self.registers.get_de(), self.registers.a); 8 }, //LD (DE),A
       0x13 => { self.registers.set_de(self.registers.get_de().wrapping_add(1)); 8 }, //INC DE
+      0x17 => { self.registers.a = self.alu_rl(self.registers.a); 4 }, //RLA - rotate left through carry
+      0x18 => { self.jump_r(); 12 }, //JR n
       0x1A => { self.registers.a = self.mmu.read_byte(self.registers.get_de()); 8 }, //LD A,(DE)
       0x1C => { self.registers.e = self.alu_inc(self.registers.e); 4 }, //INC C
       0x20 => { if !self.registers.get_flag(CpuFlag::Z) { self.jump_r(); } else { self.registers.pc += 1; }; 8 }, //JR NZ, n
-      0x21 => { let next_word = self.fetch_word(); self.registers.set_hl(next_word); 12 }, //LD HL, nn
+      0x21 => { let next_word = self.fetch_word(); self.registers.set_hl(next_word); 12 }, //LD HL,nn
+      0x22 => { self.mmu.write_byte(self.registers.get_hli(), self.registers.a); 12 }, //LD (HL+),A
       0x23 => { self.registers.set_hl(self.registers.get_hl().wrapping_add(1)); 8 }, //INC HL
       0x27 => { self.alu_daa(); 4 }, //DAA
       0x28 => { if self.registers.get_flag(CpuFlag::Z) { self.jump_r(); } else { self.registers.pc += 1; }; 8 }, //JR Z, n
@@ -99,16 +102,52 @@ impl CPU {
       0x35 => { let dec_byte = self.alu_dec(self.mmu.read_byte(self.registers.get_hl())); self.mmu.write_byte(self.registers.get_hl(), dec_byte); 12 } //DEC (HL)
       0x36 => { let next_byte = self.fetch_byte(); self.mmu.write_byte(self.registers.get_hl(), next_byte); 12 }, //LD (HL),n
       0x38 => { if self.registers.get_flag(CpuFlag::C) { self.jump_r(); 12 } else { self.registers.pc += 1; 8 } }, //JR C, n
+      0x39 => { self.alu_add16(self.registers.sp); 8 } //ADD HL,SP
       0x3A => { self.registers.a = self.mmu.read_byte(self.registers.get_hld()); 8 }, //LD A,(HL-)
       0x3C => { self.registers.a = self.alu_inc(self.registers.a); 4 }, //INC A
       0x3D => { self.registers.a = self.alu_dec(self.registers.a); 4 }, //DEC A
       0x3E => { self.registers.a = self.fetch_byte(); 8 }, //LD A,#
+      0x40 => { self.registers.b = self.registers.b; 4 }, //LD B,B
+      0x41 => { self.registers.b = self.registers.c; 4 }, //LD B,C
+      0x42 => { self.registers.b = self.registers.d; 4 }, //LD B,D
+      0x43 => { self.registers.b = self.registers.e; 4 }, //LD B,E
+      0x44 => { self.registers.b = self.registers.h; 4 }, //LD B,H
+      0x45 => { self.registers.b = self.registers.l; 4 }, //LD B,L
+      0x46 => { self.registers.b = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD B,(HL)
       0x47 => { self.registers.b = self.registers.a; 4 }, //LD B,A
+      0x48 => { self.registers.c = self.registers.b; 4 }, //LD C,B
+      0x49 => { self.registers.c = self.registers.c; 4 }, //LD C,C
+      0x4A => { self.registers.c = self.registers.d; 4 }, //LD C,D
+      0x4B => { self.registers.c = self.registers.e; 4 }, //LD C,E
+      0x4C => { self.registers.c = self.registers.h; 4 }, //LD C,H
+      0x4D => { self.registers.c = self.registers.l; 4 }, //LD C,L
+      0x4E => { self.registers.c = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD C,(HL)
       0x4F => { self.registers.c = self.registers.a; 4 }, //LD C,A
       0x50 => { self.registers.d = self.registers.b; 4 }, //LD D,B
+      0x51 => { self.registers.d = self.registers.c; 4 }, //LD D,C
+      0x52 => { self.registers.d = self.registers.d; 4 }, //LD D,D
+      0x53 => { self.registers.d = self.registers.e; 4 }, //LD D,E
+      0x54 => { self.registers.d = self.registers.h; 4 }, //LD D,H
+      0x55 => { self.registers.d = self.registers.l; 4 }, //LD D,L
+      0x56 => { self.registers.d = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD D,(HL)
+      0x57 => { self.registers.d = self.registers.a; 4 }, //LD D,A
+      0x58 => { self.registers.e = self.registers.b; 4 }, //LD E,B
+      0x59 => { self.registers.e = self.registers.c; 4 }, //LD E,C
+      0x5A => { self.registers.e = self.registers.d; 4 }, //LD E,D
+      0x5B => { self.registers.e = self.registers.e; 4 }, //LD E,E
+      0x5C => { self.registers.e = self.registers.h; 4 }, //LD E,H
+      0x5D => { self.registers.e = self.registers.l; 4 }, //LD E,L
+      0x5E => { self.registers.e = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD E,(HL)
+      0x5F => { self.registers.e = self.registers.a; 4 }, //LD E,A
       0x67 => { self.registers.h = self.registers.a; 4 }, //LD H,A
       0x6E => { self.registers.l = self.mmu.read_byte(self.registers.get_hl()); 8 }, //LD L,(HL)
       0x6F => { self.registers.l = self.registers.a; 4 }, //LD L,A
+      0x70 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.b); 8 }, //LD (HL),B
+      0x71 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.c); 8 }, //LD (HL),C
+      0x72 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.d); 8 }, //LD (HL),D
+      0x73 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.e); 8 }, //LD (HL),E
+      0x74 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.h); 8 }, //LD (HL),H
+      0x75 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.l); 8 }, //LD (HL),L
       0x76 => { self.halted = true; 4 }, //HALT
       0x77 => { self.mmu.write_byte(self.registers.get_hl(), self.registers.a); 8 }, //LD (HL),A
       0x78 => { self.registers.a = self.registers.b; 4 }, //LD A,B
@@ -288,8 +327,16 @@ impl CPU {
     self.registers.set_flag(CpuFlag::Z, result == 0);
     self.registers.set_flag(CpuFlag::N, false);
     self.registers.set_flag(CpuFlag::H, (((self.registers.a & 0x0F) + (value & 0x0F)) & 0x10) == 0x10);
-    self.registers.set_flag(CpuFlag::C, self.registers.a as u16 + value as u16 > 0xFF);
+    self.registers.set_flag(CpuFlag::C, self.registers.a as usize + value as usize > 0xFF);
     self.registers.a = result;
+  }
+
+  fn alu_add16(&mut self, value: u16) {
+    let result = self.registers.get_hl().wrapping_add(value);
+    self.registers.set_flag(CpuFlag::N, false);
+    self.registers.set_flag(CpuFlag::H, (((self.registers.get_hl() & 0x00FF) + (value & 0x00FF)) & 0x0100) == 0x0100);
+    self.registers.set_flag(CpuFlag::C, self.registers.get_hl() as usize + value as usize > 0xFFFF);
+    self.registers.set_hl(result); //16bit add goes to hl
   }
 
   fn alu_adc(&mut self, value: u8) { //like add + carry flag
@@ -347,6 +394,62 @@ impl CPU {
     self.registers.set_flag(CpuFlag::Z, self.registers.a == 0);
     self.registers.set_flag(CpuFlag::H, false);
     self.registers.set_flag(CpuFlag::C, adjust >= 0x60);
+  }
+
+  fn alu_shift_operation_flag_update(&mut self, result: u8, new_carry: bool) {
+    self.registers.reset_flags();
+    self.registers.set_flag(CpuFlag::Z, result == 0);
+    self.registers.set_flag(CpuFlag::C, new_carry);
+  }
+
+  fn alu_rl(&mut self, value: u8) -> u8 { //rotate left through carry
+    let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
+    let result = (value < 1) | if self.registers.get_flag(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the carry to the right
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  fn alu_rlc(&mut self, value: u8) -> u8 { //rotate left
+    let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
+    let result = (value < 1) | if new_carry(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the pushed out bit to the right
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  fn alu_rr(&mut self, value: u8) -> u8 { //rotate right through carry
+    let new_carry = (value & 0x01) == 0x01;
+    let result = (value > 1) | if self.registers.get_flag(CpuFlag::C) { 0x80 } else { 0x00 };
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  fn alu_rrc(&mut self, value: u8) -> u8 { //rotate right
+    let new_carry = (value & 0x01) == 0x01;
+    let result = (value > 1) | if new_carry { 0x80 } else { 0x00 };
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  //difference between shift and rotate is, that we don't add the pushed out bit on the other side
+  fn alu_sla(&mut self, value: u8) -> u8 { //shift left arithmetic (b0=0)
+    let new_carry = (value & 0x80) == 0x80;
+    let result = value << 1;
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  fn alu_sra(&mut self, value: u8) -> u8 { //shift left arithmetic (b0=0)
+    let new_carry = (value & 0x01) == 0x01;
+    let result = (value >> 1) | (value & 0x80);
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
+  }
+
+  fn alu_srl(&mut self, value: u8) -> u8 { //shift left arithmetic (b0=0)
+    let new_carry = (value & 0x01) == 0x01;
+    let result = value >> 1;
+    self.alu_shift_operation_flag_update(result, new_carry);
+    result
   }
 
   fn jump_r(&mut self) {
