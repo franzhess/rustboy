@@ -139,8 +139,8 @@ impl GPU {
   }
 
   /* timing
-    Line (background) 172
-    Line (sprites) 80
+    OAM search - 80 - determine which sprites are visible
+    pixel transfer - 172 - draw the stuff
     Horizontal blank 204
     Single line 456
     Vertical blank 4560
@@ -193,8 +193,8 @@ impl GPU {
 
     //@TODO do rendering stuff
     match mode {
-      0 => (), //@TODO render line here
-      1 => { self.render_frame(); self.irq_vblank = true }, //@TODO when rendering lines remove render frame
+      2 => (), //determine visible sprites
+      3 => (), //draw the current line
       _ => ()
     }
   }
