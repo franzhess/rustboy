@@ -23,7 +23,6 @@ impl CPU {
 
   pub fn tick(&mut self, input_state: [bool; 8]) -> usize {
     //@TODO interrupt magic
-    if !self.halted {
       if self.ime {
         let irq = self.mmu.read_byte(0xFFFF) & self.mmu.read_byte(0xFF0F);
         if irq > 0 { // there is an interrupt we need to handle it @TODO only vblank for now
@@ -41,22 +40,21 @@ impl CPU {
         }
       }
 
-      let ticks = self.do_cylce();
+      let ticks =     if !self.halted {
+        self.do_cylce()
+      } else { 4 };
+
       self.mmu.do_ticks(ticks);
 
       ticks
-    } else {
-      //check for interrupts
-      0
-    }
   }
 
   pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
     self.mmu.get_screen_buffer()
   }
 
-  pub fn screen_changed(&self) -> bool {
-    self.mmu.read_byte(0xFF0F) & 0x01 == 0x01
+  pub fn get_screen_updated(&mut self) -> bool {
+    self.mmu.get_screen_updated()
   }
 
   fn do_cylce(&mut self) -> usize {

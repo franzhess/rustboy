@@ -6,6 +6,8 @@ pub const SCREEN_HEIGHT: usize = 144;
 
 pub struct GPU {
   pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+  pub screen_update: bool,
+
   pub irq_vblank: bool,
   pub irq_stat: bool,
 
@@ -40,6 +42,7 @@ impl GPU {
   pub fn new() -> GPU {
     GPU {
       screen_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
+      screen_update: false,
       irq_vblank: false,
       irq_stat: false,
       clock: 0, // for the first line
@@ -153,18 +156,21 @@ impl GPU {
         self.clock -= 456;
         self.line = (self.line + 1) % 154; //154 = 144 physical lines + 10 imaginary vblank lines
 
-        if self.line > 144 && self.mode != 1 {
+        if self.line >= 144 && self.mode != 1 {
           self.set_mode(1);
         }
       }
 
-      if self.clock <= 80 {
-        if self.mode != 2 { self.set_mode(2); }
-      } else if self.clock <= 80 + 172 {
-        if self.mode != 3 { self.set_mode(3); }
-      } else {
-        if self.mode != 0 { self.set_mode(0); }
+      if self.line < 144 {
+        if self.clock <= 80 {
+          if self.mode != 2 { self.set_mode(2); }
+        } else if self.clock <= 80 + 172 {
+          if self.mode != 3 { self.set_mode(3); }
+        } else {
+          if self.mode != 0 { self.set_mode(0); }
+        }
       }
+
     } else { //when the lcd is disabled line and mode are reset
       self.line = 0;
       self.mode = 0;
@@ -193,66 +199,73 @@ impl GPU {
 
     //@TODO do rendering stuff
     match mode {
+      1 => self.screen_update = true, //we finished the screen, tell the window to refresh
       2 => (), //determine visible sprites
-      3 => (), //draw the current line
-      _ => ()
+      3 => self.render_line(), //draw the current line
+      _ => () //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
     }
   }
 
-  fn render_frame(&mut self) {
+  fn render_line(&mut self) {
     self.render_background();
+
+    if self.window_enable {
+      self.render_window();
+    }
+
     if self.sprite_enable {
       self.render_sprites();
     }
   }
 
   fn render_background(&mut self) {
-    let tile_map_address = if self.bg_tilemap_select { 0x9C00u16 } else { 0x9800u16 };
+    let tile_map_address = if self.bg_tilemap_select { 0x1C00 } else { 0x1800 };
 
-    let mut db = [[0u8; 256]; 256];
+    let mut current_tile = 0; //address of the currently selected tile
+    let mut color:[u8;8] = [0;8];
 
-    for y in 0..32 {
-      for x in 0..32 {
-        let tile_address = if self.bg_window_tile_addressing {
-          0x8000u16 + self.read_byte(tile_map_address + (x + y * 32) as u16) as u16
-        } else {
-          0x9000u16.wrapping_add(self.read_byte(tile_map_address + (x + y * 32) as u16) as i8 as i16 as u16)
-        };
+    let y = self.line as usize; //the line index
+    let bg_y = y + self.scroll_y as usize;
+    let bg_y_tile = bg_y / 8;  // there are 32x32 tiles that are 8x8 - find the tile index by divide through 8
+    let bg_y_offset = bg_y % 8; //the offset of the line inside the sprite;
 
-        for row in 0..8 {
-          let row_address = tile_address + row * 2;
-          let first = self.read_byte(row_address);
-          let second = self.read_byte(row_address + 1);
+    for x in 0 .. SCREEN_WIDTH { //draw one pixel after the other
+      let bg_x = x + self.scroll_x as usize;
+      let bg_x_tile = bg_x / 8;
+      let bg_x_offset = bg_x % 8;
 
-          let colors = GPU::sprite_row(first, second);
-          for (i, value) in colors.iter().enumerate() {
-            db[y * 8 + row as usize][x * 8 + i] = *value;
-          }
-        }
+      let tile_selected_tile = tile_map_address + (bg_y_tile * 32) + bg_x_tile;
+      if tile_selected_tile != current_tile {
+        let tile_offset = self.vram[tile_selected_tile];
+        let tile_address = if self.bg_window_tile_addressing { tile_offset as usize * 16 } else { 0x1000u16.wrapping_add((tile_offset as i8 as i16 * 16) as u16) as usize }; //false = 8800-97FF / true = 8000-8FFF
+        let byte_address = tile_address + (bg_y_offset * 2);
+
+        color = GPU::sprite_row(self.vram[byte_address], self.vram[byte_address + 1], self.bg_palette);
+        current_tile = tile_selected_tile;
       }
-    }
 
-    for x in 0..SCREEN_WIDTH {
-      for y in 0..SCREEN_HEIGHT {
-        self.screen_buffer[y][x] = db[y][x];
-        //self.screen_buffer[y][x] = ((x + y) % 4) as u8;
-      }
+      self.screen_buffer[y][x] = color[bg_x_offset];
     }
+  }
+
+  fn render_window(&mut self) {
+
   }
 
   fn render_sprites(&mut self) {
       for sprite_num in 0..40 {
         let sprite_address = 0xFE00u16 + (39 - sprite_num) * 4;
-        println!("rendering sprite: {:#06X}", sprite_address);
+        //println!("rendering sprite: {:#06X}", sprite_address);
       }
   }
 
-  fn sprite_row(first: u8, second: u8) -> [u8;8] {
+  fn sprite_row(first: u8, second: u8, palette: u8) -> [u8;8] {
     //println!("{:#06X} {:#06X}", first, second);
     let mut result = [0u8; 8];
     for i in 0 .. 8 {
       let bit_index = 7 - i; // bit 7 left most bit 0 right most
-      result[i] = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
+      let color_index = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
+      result[i] = (palette >> color_index * 2) & 0x03;
     }
     result
   }

@@ -21,18 +21,19 @@ fn main() {
   let mut cpu = CPU::new(buffer);
 
   let mut ticks: usize = 0;
-  let mut last_ticks: usize = 0;
   let mut now = Instant::now();
   while let Ok(input_state) = input.process_input() {
     ticks += cpu.tick(input_state);
     //let ten_millis = Duration::from_millis(100);
     //thread::sleep(ten_millis);
 
+    if cpu.get_screen_updated() {
+      display.draw_screen(cpu.get_screen_buffer());
+    }
 
     if now.elapsed() >= Duration::from_millis(1000) {
-      display.draw_screen(cpu.get_screen_buffer());
-      println!("{} ticks in the last second", ticks - last_ticks);
-      last_ticks = ticks;
+      println!("{} ticks in the last second", ticks);
+      ticks = 0;
       now = Instant::now();
     }
   }

@@ -75,6 +75,14 @@ impl MMU {
     &self.gpu.screen_buffer
   }
 
+  pub fn get_screen_updated(&mut self) -> bool {
+    let b = self.gpu.screen_update;
+    if self.gpu.screen_update {
+      self.gpu.screen_update = false;
+    }
+    b
+  }
+
   pub fn do_ticks(&mut self, ticks: usize) {
     if self.gpu.irq_vblank {
       self.interrupt_request |= 0x01;
