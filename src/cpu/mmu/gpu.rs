@@ -19,7 +19,7 @@ pub struct GPU {
   window_enable: bool, //FF40
   bg_window_tile_addressing: bool, //FF40 - false = 8800-97FF / true = 8000-8FFF
   bg_tilemap_select: bool, //FF40 false = 9800-9BFF / true = 9C00-9FFF
-  sprite_size: bool, //FF40 false = 8x8 / true = 8x16
+  sprite_size: usize, //FF40 false = 8x8 / true = 8x16
   sprite_enable: bool, //FF40
   bg_window_priority: bool, //FF40
   mode: u8, //Mode 0,1,2,3 FF41
@@ -53,7 +53,7 @@ impl GPU {
       window_enable: false,
       bg_window_tile_addressing: false,
       bg_tilemap_select: false,
-      sprite_size: false,
+      sprite_size: 8,
       sprite_enable: false,
       bg_window_priority: false,
       mode: 0x00,
@@ -83,7 +83,7 @@ impl GPU {
         (if self.window_enable { 0x20 } else { 0x00 }) |
         (if self.bg_window_tile_addressing { 0x10 } else { 0x00 }) |
         (if self.bg_tilemap_select { 0x08 } else { 0x00 }) |
-        (if self.sprite_size { 0x04 } else { 0x00 }) |
+        (if self.sprite_size == 16 { 0x04 } else { 0x00 }) |
         (if self.sprite_enable { 0x02 } else { 0x00 }) |
         (if self.bg_window_priority { 0x01 } else { 0x00 })
       },
@@ -118,7 +118,7 @@ impl GPU {
         self.window_enable = value & 0x20 == 0x20;
         self.bg_window_tile_addressing = value & 0x10 == 0x10;
         self.bg_tilemap_select = value & 0x08 == 0x08;
-        self.sprite_size = value & 0x04 == 0x04;
+        self.sprite_size = if value & 0x04 == 0x04 { 16 } else { 8 };
         self.sprite_enable = value & 0x02 == 0x02;
         self.bg_window_priority = value & 0x01 == 0x01;
       },
@@ -241,11 +241,11 @@ impl GPU {
         let tile_address = if self.bg_window_tile_addressing { tile_offset as usize * 16 } else { 0x1000u16.wrapping_add((tile_offset as i8 as i16 * 16) as u16) as usize }; //false = 8800-97FF / true = 8000-8FFF
         let byte_address = tile_address + (bg_y_offset * 2);
 
-        color = GPU::sprite_row(self.vram[byte_address], self.vram[byte_address + 1], self.bg_palette);
+        color = GPU::sprite_row(self.vram[byte_address], self.vram[byte_address + 1]);
         current_tile = tile_selected_tile;
       }
 
-      self.screen_buffer[y][x] = color[bg_x_offset];
+      self.screen_buffer[y][x] = (self.bg_palette >> color[bg_x_offset]* 2) & 0x03;
     }
   }
 
@@ -258,12 +258,18 @@ impl GPU {
         let sprite_address = (39 - sprite_num) * 4;
 
         let y = self.voam[sprite_address] as usize;
-        if y > 0 && y < 160 { //otherwise the sprite is hidden @TODO sprite ordering by x coordinate
-          let x = self.voam[sprite_address + 1] as usize;
-          if x > 0 && x < 168 {
+        let x = self.voam[sprite_address + 1] as usize;
+
+        let line = self.line as usize + 16;
+        if y > 0 && y < 160 && x > 0 && x < 168 { //otherwise the sprite is hidden @TODO sprite ordering by x coordinate
+          if line > y  && line < (y + self.sprite_size) {
             let sprite_id = self.voam[sprite_address + 2];
-            //println!("Drawing sprite {} @ x: {} y: {}", sprite_id, x, y);
             let sprite_attributes = self.voam[sprite_address + 3];
+
+            let palette = if sprite_attributes & 0x10 == 0x10 { self.obj_palette_2 } else { self.obj_palette_1 };
+            let flip_x = sprite_attributes & 0x20 == 0x20;
+            let flip_y = sprite_attributes & 0x40 == 0x40;
+
 
             /*  Bit7   OBJ-to-BG Priority (0=OBJ Above BG, 1=OBJ Behind BG color 1-3)
               (Used for both BG and Window. BG color 0 is always behind OBJ)
@@ -274,12 +280,16 @@ impl GPU {
               Bit2-0 Palette number  **CGB Mode Only**     (OBP0-7) */
 
             let sprite_start_address = sprite_id as usize * 16;
-            for sprite_line in 0..8 {
-              let first = self.vram[sprite_start_address + sprite_line * 2];
-              let second = self.vram[sprite_start_address + sprite_line * 2 + 1];
-              let color = GPU::sprite_row(first, second, self.obj_palette_1);
-              for x_offset in 0..8 {
-                self.screen_buffer[y + sprite_line - 16][x + x_offset - 8] = color[x_offset];
+            let sprite_line = if flip_y { y + self.sprite_size - line } else { line - y };
+
+            let first = self.vram[sprite_start_address + sprite_line * 2];
+            let second = self.vram[sprite_start_address + sprite_line * 2 + 1];
+
+            let color = GPU::sprite_row(first, second);
+            for x_offset in 0..8 {
+              let pixel = if flip_x { 7 - x_offset } else { x_offset };
+              if color[pixel] > 0 {
+                self.screen_buffer[self.line as usize][x + x_offset - 8] = (palette >> color[pixel] * 2) & 0x03;
               }
             }
           }
@@ -287,13 +297,12 @@ impl GPU {
       }
   }
 
-  fn sprite_row(first: u8, second: u8, palette: u8) -> [u8;8] {
+  fn sprite_row(first: u8, second: u8) -> [u8;8] {
     //println!("{:#06X} {:#06X}", first, second);
     let mut result = [0u8; 8];
     for i in 0 .. 8 {
       let bit_index = 7 - i; // bit 7 left most bit 0 right most
-      let color_index = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
-      result[i] = (palette >> color_index * 2) & 0x03;
+      result[i] = ((first >> bit_index) & 0x01 ) | (((second >> bit_index) & 0x01) << 1);
     }
     result
   }

@@ -22,54 +22,41 @@ impl CPU {
   }
 
   pub fn tick(&mut self, input_state: [bool; 8]) -> usize {
-      self.handle_irq();
+    self.mmu.set_joypad_state(input_state);
 
-      let ticks =     if !self.halted {
-        self.do_cylce()
-      } else { 4 };
+    self.handle_irq();
 
-      self.mmu.do_ticks(ticks);
+    let ticks = if !self.halted {
+      self.do_cylce()
+    } else { 4 };
 
-      ticks
+    self.mmu.do_ticks(ticks);
+
+    ticks
   }
 
   fn handle_irq(&mut self) {
     self.mmu.process_irq_requests(); //loads the irq requests into 0xFF0F
 
-    if self.ime {
-      let irq_enabled = self.mmu.read_byte(0xFFFF);
-      let irq_requested = self.mmu.read_byte(0xFF0F);
+    let irq_requested = self.mmu.read_byte(0xFF0F);
+    let irq = self.mmu.read_byte(0xFFFF) & irq_requested & 0x1F;
+    if irq > 0 { //there was an interrupt
+      self.halted = false; //end halt when an interrupt occurs
 
-      //println!("enabled: {:08b}, requested: {:08b}", irq_enabled, irq_requested);
-
-      let irq =  irq_enabled & irq_requested;
-      if irq > 0 { //there was an interrupt
-        println!("Interupt triggered! {:#06X}", irq);
+      if self.ime { //if interrupts are enabled, handle them
         self.ime = false; //don´t allow new interrupts until we handled this one
-        self.halted = false; //end halt when an interrupt occurs
-        self.push(self.registers.pc);
 
-        //the order represents their priority
-        if (irq & 0x01) == 0x01 {
-          self.registers.pc = 0x0040; //vblank handler address
-          self.mmu.write_byte(0xFF0F, irq_requested & !0x01); //reset interupt request
-        } else if (irq & 0x02) == 0x02 {
-          self.registers.pc = 0x0048; //LCD STAT
-          self.mmu.write_byte(0xFF0F, irq_requested & !0x02); //reset interupt request
-        } else if (irq & 0x04) == 0x04 {
-          self.registers.pc = 0x0050; //timer
-          self.mmu.write_byte(0xFF0F, irq_requested & !0x04); //reset interupt request
-        } else if (irq & 0x08) == 0x08 {
-          self.registers.pc = 0x0058; //serial
-          self.mmu.write_byte(0xFF0F, irq_requested & !0x08); //reset interupt request
-        } else if (irq & 0x10) == 0x10 {
-          self.registers.pc = 0x0060; //joypad
-          self.mmu.write_byte(0xFF0F, irq_requested & !0x10); //reset interupt request
-        }
+        let irq_num = irq.trailing_zeros(); //0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
+
+        self.push(self.registers.pc);
+        self.registers.pc = (0x0040 + 8 * irq_num) as u16; // jump to the interrupt handler
+
+        self.mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));  //reset the irq request - like res
 
       }
     }
   }
+
 
   pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
     self.mmu.get_screen_buffer()
@@ -558,7 +545,7 @@ impl CPU {
       0xCD => { self.registers.l = self.registers.l | (1 << 1); 8 }, //SET 1,L
       0xCE => { let new_value = self.mmu.read_byte(self.registers.get_hl())  | (1 << 1); self.mmu.write_byte(self.registers.get_hl(), new_value); 8 }, //SET 1,(HL)
       0xCF => { self.registers.a = self.registers.a | (1 << 1); 8 }, //SET 1,A
-      0x0 => { self.registers.b = self.registers.b | (1 << 2); 8 }, //SET 2,B
+      0xD0 => { self.registers.b = self.registers.b | (1 << 2); 8 }, //SET 2,B
       0xD1 => { self.registers.c = self.registers.c | (1 << 2); 8 }, //SET 2,C
       0xD2 => { self.registers.d = self.registers.d | (1 << 2); 8 }, //SET 2,D
       0xD3 => { self.registers.e = self.registers.e | (1 << 2); 8 }, //SET 2,E

@@ -1,11 +1,13 @@
 mod mbc;
 mod timer;
 pub mod gpu;
+pub mod joypad;
 
 use std::str;
 use crate::cpu::mmu::gpu::GPU;
 use crate::cpu::mmu::gpu::VOAM_SIZE;
 use crate::cpu::mmu::timer::Timer;
+use crate::cpu::mmu::joypad::Joypad;
 
 const ADDR_TITLE_START: usize = 0x0134;
 const ADDR_TITLE_END: usize = 0x0142;
@@ -15,6 +17,7 @@ pub struct MMU {
   buffer: [u8; 0xFFFF],
   gpu: GPU,
   timer: Timer,
+  joypad: Joypad,
   interrupt_enable: u8,
   interrupt_request: u8,
 }
@@ -37,8 +40,9 @@ impl MMU {
       buffer,
       gpu: GPU::new(),
       timer: Timer::new(),
-      interrupt_enable: 0,
-      interrupt_request: 0
+      joypad: Joypad::new(),
+      interrupt_enable: 0x00,
+      interrupt_request: 0x00
     }
   }
 
@@ -49,7 +53,7 @@ impl MMU {
       0xC000 ... 0xDFFF => self.buffer[address as usize], //WRAM
       0xFE00 ... 0xFE9F => self.gpu.read_byte(address), //OAM
       0xFEA0 ... 0xFEFF => 0, //not useable
-      0xFF00 => 0xFF, //Joypad
+      0xFF00 => self.joypad.read(), //Joypad
       0xFF04 ... 0xFF07 => self.timer.read_byte(address), //TIMER
       0xFF0F => self.interrupt_request,
       0xFF46 => 0,
@@ -57,7 +61,7 @@ impl MMU {
       0xFF80 ... 0xFFFE => self.buffer[address as usize], //HRAM
       0xFFFF => self.interrupt_enable,
       _ => {
-        println!("Read through to unmapped memory address: {:#06X}", address);
+        //println!("Read through to unmapped memory address: {:#06X}", address);
         self.buffer[address as usize]
       }
     }
@@ -74,7 +78,7 @@ impl MMU {
       0xC000 ... 0xDFFF => self.buffer[address as usize] = value, //WRAM
       0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value), //OAM
       0xFEA0 ... 0xFEFF => (), //not useable
-      0xFF00 => (), //JOYPAD
+      0xFF00 => self.joypad.write(value), //JOYPAD
       0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
       0xFF46 => self.copy_to_voam(value),
@@ -82,7 +86,7 @@ impl MMU {
       0xFF80 ... 0xFFFE => self.buffer[address as usize] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
       _ => {
-        println!("Write through to unmapped memory address: {:#06X}", address);
+        //println!("Write through to unmapped memory address: {:#06X}", address);
         self.buffer[address as usize] = value;
       }
     }
@@ -103,6 +107,10 @@ impl MMU {
       self.gpu.screen_update = false;
     }
     b
+  }
+
+  pub fn set_joypad_state(&mut self, input_state: [bool; 8]) {
+    self.joypad.set_state(input_state);
   }
 
   pub fn do_ticks(&mut self, ticks: usize) {

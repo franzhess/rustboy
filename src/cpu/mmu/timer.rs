@@ -8,7 +8,7 @@ pub struct Timer {
   timer_ticks: usize,
   timer_modulo: u8,
   timer_enabled: bool,
-  timer_mode: u8
+  timer_steps: usize
 }
 
 impl Timer {
@@ -23,13 +23,24 @@ impl Timer {
       timer_ticks: 0,
       timer_modulo: 0,
       timer_enabled: false,
-      timer_mode: 0
+      timer_steps: 1024
     }
   }
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
       0xFF04 => self.divide,
+      0xFF05 => self.timer_counter,
+      0xFF06 => self.timer_modulo,
+      0xFF07 => {
+        (if self.timer_enabled { 0x04 } else { 0x0 }) |
+        (match self.timer_steps {
+          1024 => 0x00,
+          16 => 0x01,
+          64 => 0x02,
+          _ => 0x03
+        })
+      },
       _ => { println!("Read at unmapped timer address: {:#06X}", address); 0x00 }
     }
   }
@@ -41,7 +52,12 @@ impl Timer {
       0xFF06 => self.timer_modulo = value,
       0xFF07 => {
         self.timer_enabled = (value & 0x04) == 0x04; //bit 2 is enabled yes/no
-        self.timer_mode = value & 0x03; // the two lowest bits are the mode
+        self.timer_steps = match value & 0x03 {
+          0 => 1024,
+          1 => 16,
+          2 => 64,
+          _ => 256
+        }; // the two lowest bits are the mode
       },
       _ => { println!("Write to unmapped timer address: {:#06X}", address); }
     }
@@ -60,21 +76,15 @@ impl Timer {
     }
 
     if self.timer_enabled {
-      let timer_freq = match self.timer_mode {
-        0 => 1024,
-        1 => 16,
-        2 => 64,
-        3 => 256,
-        _ => panic!("illegal timer mode!")
-      };
-
       self.timer_ticks += ticks;
-      while self.timer_ticks >= timer_freq {
-        self.timer_ticks -= timer_freq;
+      while self.timer_ticks >= self.timer_steps {
+        self.timer_ticks -= self.timer_steps;
         self.timer_counter = if self.timer_counter == 0xFF {
           self.irq_timer = true;
           self.timer_modulo
-        } else { self.timer_counter + 1 };
+        } else {
+          self.timer_counter + 1
+        };
       }
     }
   }
