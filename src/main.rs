@@ -15,7 +15,7 @@ fn main() {
 
   let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
 
-  let mut f = fs::File::open("roms/drm.gb").unwrap(); //"roms/cpu_instrs/cpu_instrs.gb"
+  let mut f = fs::File::open("roms/tetris.gb").unwrap(); //"roms/cpu_instrs/cpu_instrs.gb"
   f.read(&mut buffer).unwrap();
 
   let mut cpu = CPU::new(buffer);

@@ -1,9 +1,11 @@
 mod mbc;
+mod timer;
 pub mod gpu;
 
 use std::str;
 use crate::cpu::mmu::gpu::GPU;
 use crate::cpu::mmu::gpu::VOAM_SIZE;
+use crate::cpu::mmu::timer::Timer;
 
 const ADDR_TITLE_START: usize = 0x0134;
 const ADDR_TITLE_END: usize = 0x0142;
@@ -12,6 +14,7 @@ const ADDR_CARTRIDGE_TYPE: usize = 0x0147;
 pub struct MMU {
   buffer: [u8; 0xFFFF],
   gpu: GPU,
+  timer: Timer,
   interrupt_enable: u8,
   interrupt_request: u8,
 }
@@ -33,6 +36,7 @@ impl MMU {
     MMU {
       buffer,
       gpu: GPU::new(),
+      timer: Timer::new(),
       interrupt_enable: 0,
       interrupt_request: 0
     }
@@ -40,13 +44,22 @@ impl MMU {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
-      0x8000 ... 0x9FFF => self.gpu.read_byte(address),
-      0xFE00 ... 0xFE9F => self.gpu.read_byte(address),
+      0x0000 ... 0x7FFF => self.buffer[address as usize], //ROM from cartridge
+      0x8000 ... 0x9FFF => self.gpu.read_byte(address), //VRAM
+      0xC000 ... 0xDFFF => self.buffer[address as usize], //WRAM
+      0xFE00 ... 0xFE9F => self.gpu.read_byte(address), //OAM
+      0xFEA0 ... 0xFEFF => 0, //not useable
+      0xFF00 => 0xFF, //Joypad
+      0xFF04 ... 0xFF07 => self.timer.read_byte(address), //TIMER
       0xFF0F => self.interrupt_request,
       0xFF46 => 0,
       0xFF40 ... 0xFF4B => self.gpu.read_byte(address),
+      0xFF80 ... 0xFFFE => self.buffer[address as usize], //HRAM
       0xFFFF => self.interrupt_enable,
-      _ => self.buffer[address as usize]
+      _ => {
+        println!("Read through to unmapped memory address: {:#06X}", address);
+        self.buffer[address as usize]
+      }
     }
   }
 
@@ -56,13 +69,22 @@ impl MMU {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0x8000 ... 0x9FFF => self.gpu.write_byte(address, value),
-      0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value),
+      0x0000 ... 0x7FFF => self.buffer[address as usize] = value, //ROM cartridge
+      0x8000 ... 0x9FFF => self.gpu.write_byte(address, value), //VRAM
+      0xC000 ... 0xDFFF => self.buffer[address as usize] = value, //WRAM
+      0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value), //OAM
+      0xFEA0 ... 0xFEFF => (), //not useable
+      0xFF00 => (), //JOYPAD
+      0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
       0xFF46 => self.copy_to_voam(value),
       0xFF40 ... 0xFF4B => self.gpu.write_byte(address, value),
+      0xFF80 ... 0xFFFE => self.buffer[address as usize] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
-      _ => self.buffer[address as usize] = value
+      _ => {
+        println!("Write through to unmapped memory address: {:#06X}", address);
+        self.buffer[address as usize] = value;
+      }
     }
   }
 
@@ -84,17 +106,25 @@ impl MMU {
   }
 
   pub fn do_ticks(&mut self, ticks: usize) {
+    self.timer.do_ticks(ticks);
+    self.gpu.do_ticks(ticks);
+  }
+
+  pub fn process_irq_requests(&mut self) {
     if self.gpu.irq_vblank {
       self.interrupt_request |= 0x01;
+      self.gpu.irq_vblank = false;
     }
 
     if self.gpu.irq_stat {
       self.interrupt_request |= 0x02;
+      self.gpu.irq_stat = false;
     }
 
-    //@TODO do timer stuff
-
-    self.gpu.do_ticks(ticks);
+    if self.timer.irq_timer {
+      self.interrupt_request |= 0x04;
+      self.timer.irq_timer = false;
+    }
   }
 
   fn copy_to_voam(&mut self, value: u8) {

@@ -22,23 +22,7 @@ impl CPU {
   }
 
   pub fn tick(&mut self, input_state: [bool; 8]) -> usize {
-    //@TODO interrupt magic
-      if self.ime {
-        let irq = self.mmu.read_byte(0xFFFF) & self.mmu.read_byte(0xFF0F);
-        if irq > 0 { // there is an interrupt we need to handle it @TODO only vblank for now
-          self.ime = false; //don´t allow new interrupts until we handled this one
-
-          self.push(self.registers.pc);
-          self.registers.pc = 0x0040; //vblank handler address
-          self.mmu.write_byte(0xFF0F, 0x00); //reset interupt request
-
-          /*Bit 0: V-Blank  Interrupt Request (INT 40h)  (1=Request)
-            Bit 1: LCD STAT Interrupt Request (INT 48h)  (1=Request)
-            Bit 2: Timer    Interrupt Request (INT 50h)  (1=Request)
-            Bit 3: Serial   Interrupt Request (INT 58h)  (1=Request)
-            Bit 4: Joypad */
-        }
-      }
+      self.handle_irq();
 
       let ticks =     if !self.halted {
         self.do_cylce()
@@ -47,6 +31,44 @@ impl CPU {
       self.mmu.do_ticks(ticks);
 
       ticks
+  }
+
+  fn handle_irq(&mut self) {
+    self.mmu.process_irq_requests(); //loads the irq requests into 0xFF0F
+
+    if self.ime {
+      let irq_enabled = self.mmu.read_byte(0xFFFF);
+      let irq_requested = self.mmu.read_byte(0xFF0F);
+
+      //println!("enabled: {:08b}, requested: {:08b}", irq_enabled, irq_requested);
+
+      let irq =  irq_enabled & irq_requested;
+      if irq > 0 { //there was an interrupt
+        println!("Interupt triggered! {:#06X}", irq);
+        self.ime = false; //don´t allow new interrupts until we handled this one
+        self.halted = false; //end halt when an interrupt occurs
+        self.push(self.registers.pc);
+
+        //the order represents their priority
+        if (irq & 0x01) == 0x01 {
+          self.registers.pc = 0x0040; //vblank handler address
+          self.mmu.write_byte(0xFF0F, irq_requested & !0x01); //reset interupt request
+        } else if (irq & 0x02) == 0x02 {
+          self.registers.pc = 0x0048; //LCD STAT
+          self.mmu.write_byte(0xFF0F, irq_requested & !0x02); //reset interupt request
+        } else if (irq & 0x04) == 0x04 {
+          self.registers.pc = 0x0050; //timer
+          self.mmu.write_byte(0xFF0F, irq_requested & !0x04); //reset interupt request
+        } else if (irq & 0x08) == 0x08 {
+          self.registers.pc = 0x0058; //serial
+          self.mmu.write_byte(0xFF0F, irq_requested & !0x08); //reset interupt request
+        } else if (irq & 0x10) == 0x10 {
+          self.registers.pc = 0x0060; //joypad
+          self.mmu.write_byte(0xFF0F, irq_requested & !0x10); //reset interupt request
+        }
+
+      }
+    }
   }
 
   pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
@@ -625,7 +647,7 @@ impl CPU {
     self.registers.a &= value;
 
     self.registers.reset_flags();
-    self.registers.set_flag(CpuFlag::Z, self.registers.a == 0);
+    self.registers.set_flag(CpuFlag::Z, self.registers.a == 0x00);
     self.registers.set_flag(CpuFlag::H, true);
   }
 

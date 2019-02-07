@@ -195,11 +195,12 @@ impl GPU {
          CGB Mode: Cannot access Palette Data (FF69,FF6B) either.
 */
   fn set_mode(&mut self, mode: u8) {
+    //println!("set mode: {}", mode);
     self.mode = mode;
 
     //@TODO do rendering stuff
     match mode {
-      1 => self.screen_update = true, //we finished the screen, tell the window to refresh
+      1 => { self.irq_vblank = true; self.screen_update = true }, //we finished the screen, tell the window to refresh
       2 => (), //determine visible sprites
       3 => self.render_line(), //draw the current line
       _ => () //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
@@ -254,8 +255,35 @@ impl GPU {
 
   fn render_sprites(&mut self) {
       for sprite_num in 0..40 {
-        let sprite_address = 0xFE00u16 + (39 - sprite_num) * 4;
-        //println!("rendering sprite: {:#06X}", sprite_address);
+        let sprite_address = (39 - sprite_num) * 4;
+
+        let y = self.voam[sprite_address] as usize;
+        if y > 0 && y < 160 { //otherwise the sprite is hidden @TODO sprite ordering by x coordinate
+          let x = self.voam[sprite_address + 1] as usize;
+          if x > 0 && x < 168 {
+            let sprite_id = self.voam[sprite_address + 2];
+            //println!("Drawing sprite {} @ x: {} y: {}", sprite_id, x, y);
+            let sprite_attributes = self.voam[sprite_address + 3];
+
+            /*  Bit7   OBJ-to-BG Priority (0=OBJ Above BG, 1=OBJ Behind BG color 1-3)
+              (Used for both BG and Window. BG color 0 is always behind OBJ)
+              Bit6   Y flip          (0=Normal, 1=Vertically mirrored)
+              Bit5   X flip          (0=Normal, 1=Horizontally mirrored)
+              Bit4   Palette number  **Non CGB Mode Only** (0=OBP0, 1=OBP1)
+              Bit3   Tile VRAM-Bank  **CGB Mode Only**     (0=Bank 0, 1=Bank 1)
+              Bit2-0 Palette number  **CGB Mode Only**     (OBP0-7) */
+
+            let sprite_start_address = sprite_id as usize * 16;
+            for sprite_line in 0..8 {
+              let first = self.vram[sprite_start_address + sprite_line * 2];
+              let second = self.vram[sprite_start_address + sprite_line * 2 + 1];
+              let color = GPU::sprite_row(first, second, self.obj_palette_1);
+              for x_offset in 0..8 {
+                self.screen_buffer[y + sprite_line - 16][x + x_offset - 8] = color[x_offset];
+              }
+            }
+          }
+        }
       }
   }
 
