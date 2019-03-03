@@ -1,13 +1,10 @@
-mod mbc;
-mod timer;
-pub mod gpu;
-pub mod joypad;
-
 use std::str;
-use crate::cpu::mmu::gpu::GPU;
-use crate::cpu::mmu::gpu::VOAM_SIZE;
-use crate::cpu::mmu::timer::Timer;
-use crate::cpu::mmu::joypad::Joypad;
+use crate::joypad::Joypad;
+use crate::gpu::GPU;
+use crate::timer::Timer;
+use crate::SCREEN_WIDTH;
+use crate::SCREEN_HEIGHT;
+use crate::VOAM_SIZE;
 
 const ADDR_TITLE_START: usize = 0x0134;
 const ADDR_TITLE_END: usize = 0x0142;
@@ -17,7 +14,7 @@ pub struct MMU {
   buffer: [u8; 0xFFFF],
   gpu: GPU,
   timer: Timer,
-  joypad: Joypad,
+  pub joypad: Joypad,
   interrupt_enable: u8,
   interrupt_request: u8,
 }
@@ -97,8 +94,8 @@ impl MMU {
     self.write_byte(address + 1, ((value & 0xFF00) >> 8) as u8);
   }
 
-  pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
-    &self.gpu.screen_buffer
+  pub fn get_screen_buffer(&self) -> Vec<u8> {
+    self.gpu.get_screen_buffer()
   }
 
   pub fn get_screen_updated(&mut self) -> bool {

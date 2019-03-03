@@ -31,7 +31,7 @@ impl Registers {
       e: 0xD8,
       h: 0x01,
       l: 0x4D,
-      sp: 0xFFFE,
+      sp: 0xFFFF, //first stack address is 0xFFFE
       pc: 0x0100
     }
   }

@@ -4,8 +4,8 @@ use sdl2::render::Canvas;
 use sdl2::Sdl;
 use sdl2::video::Window;
 
-use crate::cpu::mmu::gpu::SCREEN_HEIGHT;
-use crate::cpu::mmu::gpu::SCREEN_WIDTH;
+use core::SCREEN_WIDTH;
+use core::SCREEN_HEIGHT;
 
 pub struct Display {
   canvas: Canvas<Window>,
@@ -32,15 +32,13 @@ impl Display {
     }
   }
 
-  pub fn draw_screen(&mut self, screen_buffer: &[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]) {
+  pub fn draw_screen(&mut self, screen_buffer: Vec<u8>) {
     self.canvas.set_draw_color(Color::RGB(0, 0, 0));
     self.canvas.clear();
 
-    for (y, line) in screen_buffer.iter().enumerate() {
-      for (x, pixel) in line.iter().enumerate() {
+    for (i, pixel) in screen_buffer.iter().enumerate() {
           self.canvas.set_draw_color(map_color(*pixel));
-          self.canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
-      }
+          self.canvas.draw_point(Point::new((i % SCREEN_WIDTH) as i32, (i / SCREEN_WIDTH) as i32)).unwrap();
     }
 
     self.canvas.present();

@@ -9,6 +9,17 @@ pub enum GBKeyCode {
   Select
 }
 
+#[derive(PartialEq)]
+pub enum GBKeyState {
+  KeyUp,
+  KeyDown
+}
+
+pub struct GBKeyEvent {
+  pub key_code: GBKeyCode,
+  pub state: GBKeyState
+}
+
 pub struct Joypad {
   pub irq_joypad: bool,
 
@@ -66,5 +77,14 @@ impl Joypad {
     }
 
     self.state = new_state;
+  }
+
+  pub fn receive_event(&mut self, event: GBKeyEvent) {
+    let key_index = event.key_code as usize;
+    self.irq_joypad |= !self.state[key_index] && event.state == GBKeyState::KeyDown;
+    self.state[key_index] = match event.state {
+      GBKeyState::KeyDown => true,
+      GBKeyState::KeyUp => false
+    };
   }
 }

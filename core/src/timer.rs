@@ -47,8 +47,8 @@ impl Timer {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0xFF04 => self.divide = 0x00, //reset on any write
-      0xFF05 => self.timer_counter = value,
+      0xFF04 => { self.divide = 0x00; self.divide_ticks = 0; }, //reset on any write
+      0xFF05 => { self.timer_counter = value; self.timer_ticks = 0; },
       0xFF06 => self.timer_modulo = value,
       0xFF07 => {
         self.timer_enabled = (value & 0x04) == 0x04; //bit 2 is enabled yes/no
@@ -63,11 +63,12 @@ impl Timer {
     }
   }
 
-  /*00: CPU Clock / 1024 (DMG, CGB:   4096 Hz, SGB:   ~4194 Hz)
-            01: CPU Clock / 16   (DMG, CGB: 262144 Hz, SGB: ~268400 Hz)
-            10: CPU Clock / 64   (DMG, CGB:  65536 Hz, SGB:  ~67110 Hz)
-            11: CPU Clock / 256  (DMG, CGB:  16384 Hz, SGB:  ~16780 Hz)
-            */
+  /*
+    00: CPU Clock / 1024 (DMG, CGB:   4096 Hz, SGB:   ~4194 Hz)
+    01: CPU Clock / 16   (DMG, CGB: 262144 Hz, SGB: ~268400 Hz)
+    10: CPU Clock / 64   (DMG, CGB:  65536 Hz, SGB:  ~67110 Hz)
+    11: CPU Clock / 256  (DMG, CGB:  16384 Hz, SGB:  ~16780 Hz)
+  */
   pub fn do_ticks(&mut self, ticks: usize) {
     self.divide_ticks += ticks;
     while self.divide_ticks >= 256 {

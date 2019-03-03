@@ -1,8 +1,7 @@
-const VRAM_SIZE: usize = 0x2000; //8kB vram
-pub const VOAM_SIZE: usize = 0xA0;
-
-pub const SCREEN_WIDTH: usize = 160;
-pub const SCREEN_HEIGHT: usize = 144;
+use crate::SCREEN_WIDTH;
+use crate::SCREEN_HEIGHT;
+use crate::VRAM_SIZE;
+use crate::VOAM_SIZE;
 
 pub struct GPU {
   pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
@@ -139,6 +138,10 @@ impl GPU {
       0xFF4B => self.window_x = value,
       _ => panic!("Invalid write at GPU memory adress: {:#06X} - {:#06X}", address, value)
     }
+  }
+
+  pub fn get_screen_buffer(&self) -> Vec<u8> {
+    self.screen_buffer.iter().flat_map(|array| array.iter()).cloned().collect()
   }
 
   /* timing

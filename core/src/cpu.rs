@@ -1,14 +1,17 @@
 mod registers;
-pub mod mmu;
 
-use crate::cpu::mmu::MMU;
+use crate::mmu::MMU;
 use crate::cpu::registers::{Registers, CpuFlag};
+use crate::SCREEN_WIDTH;
+use crate::SCREEN_HEIGHT;
+use crate::joypad::GBKeyEvent;
 
 pub struct CPU {
   registers: Registers,
   mmu: MMU,
   halted: bool,
   ime: bool, // interrupt master enable - set by DI and EI
+  ei_requested: usize, //EI has one cycle delay
 }
 
 impl CPU {
@@ -18,11 +21,18 @@ impl CPU {
       mmu: MMU::new(buffer),
       halted: false,
       ime: false,
+      ei_requested: 0,
     }
   }
 
-  pub fn tick(&mut self, input_state: [bool; 8]) -> usize {
-    self.mmu.set_joypad_state(input_state);
+  pub fn tick(&mut self) -> usize { //, input_state: [bool; 8]) -> usize {
+    //self.mmu.set_joypad_state(input_state);
+
+    self.ei_requested = match self.ei_requested {
+      2 => 1,
+      1 => { self.ime = true; 0 },
+      _ => 0
+    };
 
     self.handle_irq();
 
@@ -57,8 +67,12 @@ impl CPU {
     }
   }
 
+  pub fn process_input_event(&mut self, event: GBKeyEvent) {
+    self.mmu.joypad.receive_event(event);
+  }
 
-  pub fn get_screen_buffer(&self) -> &[[u8; crate::cpu::mmu::gpu::SCREEN_WIDTH]; crate::cpu::mmu::gpu::SCREEN_HEIGHT] {
+
+  pub fn get_screen_buffer(&self) -> Vec<u8> {
     self.mmu.get_screen_buffer()
   }
 
@@ -316,7 +330,7 @@ impl CPU {
       0xF0 => { let address = 0xFF00 + self.fetch_byte() as u16; self.registers.a = self.mmu.read_byte(address); 12 }, //LDH A,(n)
       0xF1 => { let af = self.pop(); self.registers.set_af(af); 12 } //POP AF
       0xF2 => { self.registers.a = self.mmu.read_byte(0xFF00 + self.registers.c as u16);  8 }, //LD A,(C)
-      0xF3 => { self.ime = false; 4 }, //DI disable interrupts
+      0xF3 => { self.ime = false; self.ei_requested = 0; 4 }, //DI disable interrupts
     //0xF4
       0xF5 => { self.push(self.registers.get_af()); 16 }, //PUSH AF
       0xF6 => { let next_byte = self.fetch_byte(); self.alu_or(next_byte); 8 } //OR n
@@ -324,7 +338,7 @@ impl CPU {
       0xF8 => { let value = self.alu_add_next_signed_byte_to_word(self.registers.sp); self.registers.set_hl(value); 12 }, //LD HL, SP+r8
       0xF9 => { self.registers.sp = self.registers.get_hl(); 8 }, //LD SP,HL
       0xFA => { let address = self.fetch_word(); self.registers.a = self.mmu.read_byte(address); 16 }, //LD A,(nn)
-      0xFB => { self.ime = true; 4 }, //EI enable interrupts
+      0xFB => { self.ei_requested = 2; 4 }, //EI enable interrupts
     //0xFC
     //0xFD
       0xFE => { let next_byte = self.fetch_byte(); self.alu_cp(next_byte); 8 }, //CP A,n  compare a-n
@@ -834,7 +848,7 @@ impl CPU {
   }
 
   fn jump_r(&mut self) {
-    let offset = self.fetch_byte() as i8;
-    self.registers.pc = (self.registers.pc as isize + offset as isize) as u16;
+    let offset = self.fetch_byte();
+    self.registers.pc = self.registers.pc.wrapping_add(offset as i8 as i16 as u16);
   }
 }
