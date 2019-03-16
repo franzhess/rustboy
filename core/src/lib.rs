@@ -17,6 +17,7 @@ use crate::cpu::CPU;
 use crate::joypad::GBKeyEvent;
 
 use std::sync::mpsc::{Sender, Receiver};
+use std::time::{Instant, Duration};
 
 pub enum GBEvent {
   KeyEvent(GBKeyEvent),
@@ -24,6 +25,10 @@ pub enum GBEvent {
 }
 
 pub fn main_loop(mut cpu: CPU, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
+  let mut last_update = Instant::now();
+  let mut ticks: usize = 0;
+  let one_second = Duration::from_secs(1);
+
   'running: loop {
     for event in input_receiver.try_iter() {
       match event {
@@ -32,10 +37,17 @@ pub fn main_loop(mut cpu: CPU, input_receiver: Receiver<GBEvent>, screen_sender:
       }
     }
 
-    cpu.tick();
+    ticks += cpu.tick();
 
     if cpu.get_screen_updated() {
       screen_sender.send(cpu.get_screen_buffer());
     }
+
+    if last_update.elapsed() >= one_second {
+      println!("{} ticks", ticks);
+      ticks = 0;
+      last_update = Instant::now();
+    }
+
   }
 }

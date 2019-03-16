@@ -1,4 +1,5 @@
 mod registers;
+mod ops;
 
 use crate::mmu::MMU;
 use crate::cpu::registers::{Registers, CpuFlag};
