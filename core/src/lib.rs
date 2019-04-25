@@ -11,7 +11,7 @@ pub const SCREEN_HEIGHT: usize = 144;
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Instant, Duration};
 
-use crate::cpu::CPU;
+use crate::cpu::Cpu;
 use std::fs;
 use std::io::Read;
 
@@ -42,15 +42,15 @@ pub struct GBKeyEvent {
   pub state: GBKeyState
 }
 
-pub fn create_cpu(rom_file_name: &str) -> CPU {
+pub fn create_cpu(rom_file_name: &str) -> Cpu {
   let mut rom = fs::File::open(rom_file_name).unwrap();
   let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
 
   rom.read(&mut buffer).unwrap();
-  CPU::new(buffer)
+  Cpu::new(buffer)
 }
 
-pub fn main_loop(mut cpu: CPU, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
+pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
   let mut last_update = Instant::now();
   let mut ticks: usize = 0;
   let one_second = Duration::from_secs(1);

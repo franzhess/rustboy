@@ -7,6 +7,29 @@ pub enum CpuFlag {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum RegisterName8 {
+  A,
+  B,
+  C,
+  D,
+  E,
+  H,
+  L
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum RegisterName16 {
+  AF,
+  BC,
+  DE,
+  HL,
+  SP,
+  PC,
+  HLI,
+  HLD
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct Registers {
   pub a: u8,
   f: u8,
@@ -36,6 +59,31 @@ impl Registers {
     }
   }
 
+  pub fn get(&self, name: RegisterName8) -> u8 {
+    match name {
+      RegisterName8::A => { self.a },
+      RegisterName8::B => { self.b },
+      RegisterName8::C => { self.c },
+      RegisterName8::D => { self.d },
+      RegisterName8::E => { self.e },
+      RegisterName8::H => { self.h },
+      RegisterName8::L => { self.l }
+    }
+  }
+
+  pub fn get16(&mut self, name: RegisterName16) -> u16 {
+    match name {
+      RegisterName16::AF => { self.get_af() },
+      RegisterName16::BC => { self.get_bc() },
+      RegisterName16::DE => { self.get_de() },
+      RegisterName16::HL => { self.get_hl() },
+      RegisterName16::HLI => { self.get_hli() },
+      RegisterName16::HLD => { self.get_hld() },
+      RegisterName16::SP => { self.sp },
+      RegisterName16::PC => { self.pc }
+    }
+  }
+
   pub fn get_af(&self) -> u16 {
     (self.a as u16) << 8 | self.f as u16
   }
@@ -62,6 +110,30 @@ impl Registers {
     let hl = self.get_hl();
     self.set_hl(hl.wrapping_sub(1));
     hl
+  }
+
+  pub fn set(&mut self, name: RegisterName8, value: u8) {
+    match name {
+      RegisterName8::A => { self.a = value },
+      RegisterName8::B => { self.b = value },
+      RegisterName8::C => { self.c = value },
+      RegisterName8::D => { self.d = value },
+      RegisterName8::E => { self.e = value },
+      RegisterName8::H => { self.h = value },
+      RegisterName8::L => { self.l = value },
+    }
+  }
+
+  pub fn set16(&mut self, name: RegisterName16, value: u16) {
+    match name {
+      RegisterName16::AF => { self.set_af(value); },
+      RegisterName16::BC => { self.set_bc(value); },
+      RegisterName16::DE => { self.set_de(value); },
+      RegisterName16::HL => { self.set_hl(value); },
+      RegisterName16::SP => { self.sp = value; },
+      RegisterName16::PC => { self.pc = value; },
+      _ => { panic!("Cannot set hli/hld"); }
+    }
   }
 
   pub fn set_af(&mut self, w: u16) {
