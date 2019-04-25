@@ -1,7 +1,11 @@
+pub mod joypad;
+pub mod timer;
+mod gpu;
+
 use std::str;
-use crate::joypad::Joypad;
-use crate::gpu::GPU;
-use crate::timer::Timer;
+use crate::mmu::joypad::Joypad;
+use crate::mmu::gpu::GPU;
+use crate::mmu::timer::Timer;
 use crate::SCREEN_WIDTH;
 use crate::SCREEN_HEIGHT;
 use crate::VOAM_SIZE;

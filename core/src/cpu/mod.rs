@@ -1,11 +1,10 @@
-mod registers;
-mod ops;
+pub mod registers;
 
 use crate::mmu::MMU;
-use crate::cpu::registers::{Registers, CpuFlag};
 use crate::SCREEN_WIDTH;
 use crate::SCREEN_HEIGHT;
-use crate::joypad::GBKeyEvent;
+use crate::cpu::registers::{Registers, CpuFlag};
+use crate::GBKeyEvent;
 
 pub struct CPU {
   registers: Registers,
@@ -21,8 +20,8 @@ impl CPU {
       registers: Registers::new(),
       mmu: MMU::new(buffer),
       halted: false,
-      ime: false,
-      ei_requested: 0,
+      ime: false, //interrupt master enable
+      ei_requested: 0, //enable interrupt requested - in the original gameboy the enabling of the interrupts took two cycles (see tick)
     }
   }
 
@@ -39,7 +38,9 @@ impl CPU {
 
     let ticks = if !self.halted {
       self.do_cylce()
-    } else { 4 };
+    } else {
+      4
+    };
 
     self.mmu.do_ticks(ticks);
 

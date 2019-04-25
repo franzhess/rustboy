@@ -1,11 +1,6 @@
 pub mod mbc;
-pub mod gameboy;
 pub mod cpu;
-pub mod joypad;
-
-mod gpu;
-mod mmu;
-mod timer;
+pub mod mmu;
 
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
 pub const VOAM_SIZE: usize = 0xA0;
@@ -13,15 +8,46 @@ pub const VOAM_SIZE: usize = 0xA0;
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
-use crate::cpu::CPU;
-use crate::joypad::GBKeyEvent;
-
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Instant, Duration};
+
+use crate::cpu::CPU;
+use std::fs;
+use std::io::Read;
 
 pub enum GBEvent {
   KeyEvent(GBKeyEvent),
   Quit
+}
+
+pub enum GBKeyCode {
+  Up = 0,
+  Down,
+  Left,
+  Right,
+  A,
+  B,
+  Start,
+  Select
+}
+
+#[derive(PartialEq)]
+pub enum GBKeyState {
+  KeyUp,
+  KeyDown
+}
+
+pub struct GBKeyEvent {
+  pub key_code: GBKeyCode,
+  pub state: GBKeyState
+}
+
+pub fn create_cpu(rom_file_name: &str) -> CPU {
+  let mut rom = fs::File::open(rom_file_name).unwrap();
+  let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
+
+  rom.read(&mut buffer).unwrap();
+  CPU::new(buffer)
 }
 
 pub fn main_loop(mut cpu: CPU, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
@@ -48,6 +74,5 @@ pub fn main_loop(mut cpu: CPU, input_receiver: Receiver<GBEvent>, screen_sender:
       ticks = 0;
       last_update = Instant::now();
     }
-
   }
 }

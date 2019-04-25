@@ -1,29 +1,10 @@
-pub enum GBKeyCode {
-  Up = 0,
-  Down,
-  Left,
-  Right,
-  A,
-  B,
-  Start,
-  Select
-}
-
-#[derive(PartialEq)]
-pub enum GBKeyState {
-  KeyUp,
-  KeyDown
-}
-
-pub struct GBKeyEvent {
-  pub key_code: GBKeyCode,
-  pub state: GBKeyState
-}
+use crate::GBKeyCode;
+use crate::GBKeyEvent;
+use crate::GBKeyState;
 
 pub struct Joypad {
-  pub irq_joypad: bool,
-
-  state: [bool;8],
+  pub irq_joypad: bool, //interrupt is true when input has changed
+  state: [bool;8], //the state of the 8 buttons
   selector: bool, //true = buttons, false = directions
 }
 
@@ -50,20 +31,20 @@ impl Joypad {
   pub fn read(&self) -> u8 {
     let mut joypad = 0x00;
     if self.selector {
-      joypad |= 0x20;
+      joypad |= 0x20; //P15
       if self.state[GBKeyCode::A as usize] { joypad |= 0x01 };
       if self.state[GBKeyCode::B as usize] { joypad |= 0x02 };
       if self.state[GBKeyCode::Select as usize] { joypad |= 0x04 };
       if self.state[GBKeyCode::Start as usize] { joypad |= 0x08 };
     } else {
-      joypad |= 0x10;
+      joypad |= 0x10; //P14
       if self.state[GBKeyCode::Right as usize] { joypad |= 0x01 };
       if self.state[GBKeyCode::Left as usize] { joypad |= 0x02 };
       if self.state[GBKeyCode::Up as usize] { joypad |= 0x04 };
       if self.state[GBKeyCode::Down as usize] { joypad |= 0x08 };
     }
 
-    !joypad
+    !joypad //the gameboy has the input array inverted
   }
 
   pub fn write(&mut self, value: u8) {

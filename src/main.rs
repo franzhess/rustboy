@@ -1,29 +1,16 @@
 mod hardware;
 
 use hardware::init_hardware;
-
-use std::fs;
-use std::io::Read;
 use std::sync::mpsc;
 use std::thread;
 
-use core::cpu::CPU;
-use core::joypad::GBKeyEvent;
-use core::SCREEN_WIDTH;
-use core::SCREEN_HEIGHT;
-use core::main_loop;
-use core::GBEvent;
+use core::*;
 
 fn main() {
-
-  let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
-
   let (video_sender, video_receiver) = mpsc::channel::<Vec<u8>>();
   let (input_sender, input_receiver) = mpsc::channel::<GBEvent>();
 
-  let mut rom = fs::File::open("roms/tetris.gb").unwrap(); //"roms/cpu_instrs/cpu_instrs.gb"
-  rom.read(&mut buffer).unwrap();
-  let mut cpu = CPU::new(buffer);
+  let mut cpu = create_cpu("tetris.gb");
 
   let (mut input, mut display) = init_hardware(2 * SCREEN_WIDTH as u32, 2 * SCREEN_HEIGHT as u32, input_sender);
   let cpu_thread = thread::spawn(move|| main_loop(cpu, input_receiver, video_sender));

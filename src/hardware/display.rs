@@ -16,6 +16,7 @@ impl Display {
     let video_subsystem = sdl.video().unwrap();
 
     let window = video_subsystem.window("rustboy", width, height)
+      //.fullscreen_desktop()
       .position_centered()
       .build()
       .expect("Failed to create the main window!");
