@@ -6,8 +6,6 @@ use std::str;
 use crate::mmu::joypad::Joypad;
 use crate::mmu::gpu::GPU;
 use crate::mmu::timer::Timer;
-use crate::SCREEN_WIDTH;
-use crate::SCREEN_HEIGHT;
 use crate::VOAM_SIZE;
 
 const ADDR_TITLE_START: usize = 0x0134;

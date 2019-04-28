@@ -3,7 +3,7 @@ pub enum CpuFlag {
   Z = 0b10000000, //zero
   N = 0b01000000, //subtract
   H = 0b00100000, //half carry
-  C = 0b00010000 //carry
+  C = 0b00010000  //carry
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -41,6 +41,12 @@ pub struct Registers {
   pub l: u8,
   pub sp: u16,
   pub pc: u16,
+}
+
+pub trait FlagRegister {
+  fn get_flag(&self, cpu_flag: CpuFlag) -> bool;
+  fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool);
+  fn reset_flags(&mut self);
 }
 
 impl Registers {
@@ -154,12 +160,14 @@ impl Registers {
     self.h = (w >> 8) as u8;
     self.l = w as u8;
   }
+}
 
-  pub fn get_flag(&self, cpu_flag: CpuFlag) -> bool {
+impl FlagRegister for Registers {
+  fn get_flag(&self, cpu_flag: CpuFlag) -> bool {
     (self.f & cpu_flag as u8) > 0
   }
 
-  pub fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool) {
+  fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool) {
     match value {
       true => self.f |= cpu_flag as u8,
       false => self.f &= !(cpu_flag as u8)
@@ -168,7 +176,7 @@ impl Registers {
   }
 
   //if you have to clear more than one flag, this way is more efficient
-  pub fn reset_flags(&mut self) {
+  fn reset_flags(&mut self) {
     self.f = 0x00;
   }
 }

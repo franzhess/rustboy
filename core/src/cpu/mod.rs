@@ -1,25 +1,21 @@
-pub mod registers;
+mod registers;
 mod alu;
 mod op_codes;
 mod op_codes_cb;
 
 use crate::mmu::MMU;
-use crate::SCREEN_WIDTH;
-use crate::SCREEN_HEIGHT;
-use crate::cpu::registers::{Registers, CpuFlag};
 use crate::GBKeyEvent;
-use crate::cpu::registers::RegisterName8;
+use crate::cpu::registers::{Registers, RegisterName8, RegisterName16, FlagRegister};
 
 pub enum OpCodeResult {
-  Executed(ticks),
-  CB,
+  Executed(usize),
   UnknownOpCode
 }
 
-pub enum OpCodeResultCb {
-  Executed(ticks),
-  UnknownOpCode
-}
+type UnaryOperation8 = fn(&mut FlagRegister, u8) -> u8;
+type UnaryOperation16 = fn(&mut FlagRegister, u16) -> u16;
+type BinaryOperation8 = fn(&mut FlagRegister, u8, u8) -> u8;
+type BinaryOperation16 = fn(&mut FlagRegister, u16, u16) -> u16;
 
 pub struct Cpu {
   registers: Registers,
@@ -52,7 +48,7 @@ impl Cpu {
     self.handle_irq();
 
     let ticks = if !self.halted {
-      self.do_cylce()
+      self.do_cycle()
     } else {
       4
     };
@@ -96,20 +92,13 @@ impl Cpu {
     self.mmu.get_screen_updated()
   }
 
-  fn do_cylce(&mut self) -> usize {
+  fn do_cycle(&mut self) -> usize {
     let current_address = self.registers.pc;
     let op_code = self.fetch_byte();
 
     //println!("do_cycle: {:#04X} @ {:#06X}", op_code, current_address);
 
     match op_codes::execute(op_code, &mut self) {
-      OpCodeResult::CB => {
-        let op_code_cb = self.fetch_byte();
-        match op_codes_cb::execute(op_codes_cb, &mut self.registers) {
-          OpCodeResultCb::Executed(ticks) => { ticks },
-          OpCodeResultCb::UnknownOpCode => { println!("Unknown cb command {:#04X} at {:#06X}", op_code_cb, current_address); self.halted = true; 4 } //NOOP on unknown opcodes
-        }
-      },
       OpCodeResult::Executed(ticks) => { ticks },
       OpCodeResult::UnknownOpCode => { println!("Unknown command {:#04X} at {:#06X}", op_code, current_address); self.halted = true; 4 } //NOOP on unknown opcodes
     }
@@ -148,10 +137,36 @@ impl Cpu {
     self.registers.pc = self.pop();
   }
 
-
-
   fn jump_r(&mut self) {
     let offset = self.fetch_byte();
     self.registers.pc = self.registers.pc.wrapping_add(offset as i8 as i16 as u16);
+  }
+
+  fn execute(&mut self, op: UnaryOperation8) {
+    self.execute8(op, RegisterName8::A);
+  }
+
+  fn execute8(&mut self, op: UnaryOperation8, arg: RegisterName8) {
+    let result = op(&mut self.registers, self.registers.get(arg));
+    self.registers.set(arg, result);
+  }
+
+  fn executeb(&mut self, op: BinaryOperation8, arg: RegisterName8) {
+    self.execute8b(op, RegisterName8::A, arg);
+  }
+
+  fn execute8b(&mut self, op: BinaryOperation8, arg1: RegisterName8, arg2: RegisterName8) {
+    let result = op(&mut self.registers, self.registers.get(arg1), self.registers.get(arg2));
+    self.registers.set(arg1, result);
+  }
+
+  fn execute16(&mut self, op: UnaryOperation16, arg: RegisterName16) {
+    let result = op(&mut self.registers, self.registers.get16(arg));
+    self.registers.set16(arg, result);
+  }
+
+  fn execute16b(&mut self, op: BinaryOperation16, arg1: RegisterName16, arg2: RegisterName16) {
+    let result = op(&mut self.registers, self.registers.get16(arg1), self.registers.get16(arg2));
+    self.registers.set16(arg1, result);
   }
 }

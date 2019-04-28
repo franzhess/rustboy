@@ -1,10 +1,10 @@
 use crate::cpu::alu;
-use crate::cpu::OpCodeResultCb;
-use crate::cpu::OpCodeResultCb::{Executed, UnknownOpCode};
+use crate::cpu::OpCodeResult;
+use crate::cpu::OpCodeResult::{Executed, UnknownOpCode};
 use crate::cpu::Cpu;
 use crate::cpu::registers::RegisterName8;
 
-pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResultCb {
+pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
   match op_code {
     0x00 => { alu::rlc(&mut &mut cpu.registers, RegisterName8::B ); Executed(8) }, //RLC B
     0x01 => { cpu.registers.c = alu::rlc(&mut cpu.registers, cpu.registers.c); Executed(8) }, //RLC C
