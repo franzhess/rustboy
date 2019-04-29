@@ -24,9 +24,10 @@ impl Input {
 
   pub fn process_input(&mut self) -> bool {
     for event in self.event_pump.poll_iter() {
+      println!("{:?}", event);
       match event {
         Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => { //match keydown escape first so it has priority
-          self.input_sender.send(GBEvent::Quit);
+          self.input_sender.send(GBEvent::Quit).expect("failed to send input to emulator");
           return false
         },
         Event::KeyUp { keycode:Some(keycode), .. } =>  self.input_sender.send(GBEvent::KeyEvent(GBKeyEvent { state: GBKeyState::KeyUp, key_code: key_mapping(keycode) })).unwrap(),

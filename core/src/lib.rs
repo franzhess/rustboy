@@ -15,11 +15,13 @@ use crate::cpu::Cpu;
 use std::fs;
 use std::io::Read;
 
+#[derive(Debug)]
 pub enum GBEvent {
   KeyEvent(GBKeyEvent),
   Quit
 }
 
+#[derive(Debug)]
 pub enum GBKeyCode {
   Up = 0,
   Down,
@@ -31,12 +33,13 @@ pub enum GBKeyCode {
   Select
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum GBKeyState {
   KeyUp,
   KeyDown
 }
 
+#[derive(Debug)]
 pub struct GBKeyEvent {
   pub key_code: GBKeyCode,
   pub state: GBKeyState
@@ -66,7 +69,7 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender:
     ticks += cpu.tick();
 
     if cpu.get_screen_updated() {
-      screen_sender.send(cpu.get_screen_buffer());
+      screen_sender.send(cpu.get_screen_buffer()).expect("failed to send video data!");
     }
 
     if last_update.elapsed() >= one_second {

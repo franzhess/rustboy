@@ -19,14 +19,10 @@ pub enum RegisterName8 {
 
 #[derive(Debug, Copy, Clone)]
 pub enum RegisterName16 {
-  AF,
   BC,
   DE,
   HL,
   SP,
-  PC,
-  HLI,
-  HLD
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -79,14 +75,10 @@ impl Registers {
 
   pub fn get16(&mut self, name: RegisterName16) -> u16 {
     match name {
-      RegisterName16::AF => { self.get_af() },
       RegisterName16::BC => { self.get_bc() },
       RegisterName16::DE => { self.get_de() },
       RegisterName16::HL => { self.get_hl() },
-      RegisterName16::HLI => { self.get_hli() },
-      RegisterName16::HLD => { self.get_hld() },
       RegisterName16::SP => { self.sp },
-      RegisterName16::PC => { self.pc }
     }
   }
 
@@ -127,18 +119,6 @@ impl Registers {
       RegisterName8::E => { self.e = value },
       RegisterName8::H => { self.h = value },
       RegisterName8::L => { self.l = value },
-    }
-  }
-
-  pub fn set16(&mut self, name: RegisterName16, value: u16) {
-    match name {
-      RegisterName16::AF => { self.set_af(value); },
-      RegisterName16::BC => { self.set_bc(value); },
-      RegisterName16::DE => { self.set_de(value); },
-      RegisterName16::HL => { self.set_hl(value); },
-      RegisterName16::SP => { self.sp = value; },
-      RegisterName16::PC => { self.pc = value; },
-      _ => { panic!("Cannot set hli/hld"); }
     }
   }
 

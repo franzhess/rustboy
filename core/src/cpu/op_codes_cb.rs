@@ -1,139 +1,139 @@
 use crate::cpu::alu;
 use crate::cpu::OpCodeResult;
-use crate::cpu::OpCodeResult::{Executed, UnknownOpCode};
+use crate::cpu::OpCodeResult::Executed;
 use crate::cpu::Cpu;
 use crate::cpu::registers::RegisterName8;
 
 pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
   match op_code {
-    0x00 => { alu::rlc(&mut &mut cpu.registers, RegisterName8::B ); Executed(8) }, //RLC B
-    0x01 => { cpu.registers.c = alu::rlc(&mut cpu.registers, cpu.registers.c); Executed(8) }, //RLC C
-    0x02 => { cpu.registers.d = alu::rlc(&mut cpu.registers, cpu.registers.d); Executed(8) }, //RLC D
-    0x03 => { cpu.registers.e = alu::rlc(&mut cpu.registers, cpu.registers.e); Executed(8) }, //RLC E
-    0x04 => { cpu.registers.h = alu::rlc(&mut cpu.registers, cpu.registers.h); Executed(8) }, //RLC H
-    0x05 => { cpu.registers.l = alu::rlc(&mut cpu.registers, cpu.registers.l); Executed(8) }, //RLC L
-    0x06 => { let new_value = alu::rlc(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RLC (HL)
-    0x07 => { cpu.registers.a = alu::rlc(&mut cpu.registers, cpu.registers.a); Executed(8) }, //RLC A
-    0x08 => { cpu.registers.b = alu::rrc(&mut cpu.registers, cpu.registers.b); Executed(8) }, //RRC B
-    0x09 => { cpu.registers.c = alu::rrc(&mut cpu.registers, cpu.registers.c); Executed(8) }, //RRC C
-    0x0A => { cpu.registers.d = alu::rrc(&mut cpu.registers, cpu.registers.d); Executed(8) }, //RRC D
-    0x0B => { cpu.registers.e = alu::rrc(&mut cpu.registers, cpu.registers.e); Executed(8) }, //RRC E
-    0x0C => { cpu.registers.h = alu::rrc(&mut cpu.registers, cpu.registers.h); Executed(8) }, //RRC H
-    0x0D => { cpu.registers.l = alu::rrc(&mut cpu.registers, cpu.registers.l); Executed(8) }, //RRC L
-    0x0E => { let new_value = alu::rrc(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RRC (HL)
-    0x0F => { cpu.registers.a = alu::rrc(&mut cpu.registers, cpu.registers.a); Executed(8) }, //RRC A
-    0x10 => { cpu.registers.b = alu::rl(&mut cpu.registers, cpu.registers.b); Executed(8) }, //RL B
-    0x11 => { cpu.registers.c = alu::rl(&mut cpu.registers, cpu.registers.c); Executed(8) }, //RL C
-    0x12 => { cpu.registers.d = alu::rl(&mut cpu.registers, cpu.registers.d); Executed(8) }, //RL D
-    0x13 => { cpu.registers.e = alu::rl(&mut cpu.registers, cpu.registers.e); Executed(8) }, //RL E
-    0x14 => { cpu.registers.h = alu::rl(&mut cpu.registers, cpu.registers.h); Executed(8) }, //RL H
-    0x15 => { cpu.registers.l = alu::rl(&mut cpu.registers, cpu.registers.l); Executed(8) }, //RL L
-    0x16 => { let new_value = alu::rl(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RL (HL)
-    0x17 => { cpu.registers.a = alu::rl(&mut cpu.registers, cpu.registers.a); Executed(8) }, //RL A
-    0x18 => { cpu.registers.b = alu::rr(&mut cpu.registers, cpu.registers.b); Executed(8) }, //RR B
-    0x19 => { cpu.registers.c = alu::rr(&mut cpu.registers, cpu.registers.c); Executed(8) }, //RR C
-    0x1A => { cpu.registers.d = alu::rr(&mut cpu.registers, cpu.registers.d); Executed(8) }, //RR D
-    0x1B => { cpu.registers.e = alu::rr(&mut cpu.registers, cpu.registers.e); Executed(8) }, //RR E
-    0x1C => { cpu.registers.h = alu::rr(&mut cpu.registers, cpu.registers.h); Executed(8) }, //RR H
-    0x1D => { cpu.registers.l = alu::rr(&mut cpu.registers, cpu.registers.l); Executed(8) }, //RR L
-    0x1E => { let new_value = alu::rr(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RR (HL)
-    0x1F => { cpu.registers.a = alu::rr(&mut cpu.registers, cpu.registers.a); Executed(8) }, //RR A
-    0x20 => { cpu.registers.b = alu::sla(&mut cpu.registers, cpu.registers.b); Executed(8) }, //SLA B
-    0x21 => { cpu.registers.c = alu::sla(&mut cpu.registers, cpu.registers.c); Executed(8) }, //SLA C
-    0x22 => { cpu.registers.d = alu::sla(&mut cpu.registers, cpu.registers.d); Executed(8) }, //SLA D
-    0x23 => { cpu.registers.e = alu::sla(&mut cpu.registers, cpu.registers.e); Executed(8) }, //SLA E
-    0x24 => { cpu.registers.h = alu::sla(&mut cpu.registers, cpu.registers.h); Executed(8) }, //SLA H
-    0x25 => { cpu.registers.l = alu::sla(&mut cpu.registers, cpu.registers.l); Executed(8) }, //SLA L
-    0x26 => { let new_value = alu::sla(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SLA (HL)
-    0x27 => { cpu.registers.a = alu::sla(&mut cpu.registers, cpu.registers.a); Executed(8) }, //SLA A
-    0x28 => { cpu.registers.b = alu::sra(&mut cpu.registers, cpu.registers.b); Executed(8) }, //SRA B
-    0x29 => { cpu.registers.c = alu::sra(&mut cpu.registers, cpu.registers.c); Executed(8) }, //SRA C
-    0x2A => { cpu.registers.d = alu::sra(&mut cpu.registers, cpu.registers.d); Executed(8) }, //SRA D
-    0x2B => { cpu.registers.e = alu::sra(&mut cpu.registers, cpu.registers.e); Executed(8) }, //SRA E
-    0x2C => { cpu.registers.h = alu::sra(&mut cpu.registers, cpu.registers.h); Executed(8) }, //SRA H
-    0x2D => { cpu.registers.l = alu::sra(&mut cpu.registers, cpu.registers.l); Executed(8) }, //SRA L
-    0x2E => { let new_value = alu::sra(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SRA (HL)
-    0x2F => { cpu.registers.a = alu::sra(&mut cpu.registers, cpu.registers.a); Executed(8) }, //SRA A
-    0x30 => { cpu.registers.b = alu::swap(&mut cpu.registers, cpu.registers.b); Executed(8) }, //SWAP B
-    0x31 => { cpu.registers.c = alu::swap(&mut cpu.registers, cpu.registers.c); Executed(8) }, //SWAP C
-    0x32 => { cpu.registers.d = alu::swap(&mut cpu.registers, cpu.registers.d); Executed(8) }, //SWAP D
-    0x33 => { cpu.registers.e = alu::swap(&mut cpu.registers, cpu.registers.e); Executed(8) }, //SWAP E
-    0x34 => { cpu.registers.h = alu::swap(&mut cpu.registers, cpu.registers.h); Executed(8) }, //SWAP H
-    0x35 => { cpu.registers.l = alu::swap(&mut cpu.registers, cpu.registers.l); Executed(8) }, //SWAP L
-    0x36 => { let new_value = alu::swap(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SWAP (HL)
-    0x37 => { cpu.registers.a = alu::swap(&mut cpu.registers, cpu.registers.a); Executed(8) }, //SWAP A
-    0x38 => { cpu.registers.b = alu::srl(&mut cpu.registers, cpu.registers.b); Executed(8) }, //SRL B
-    0x39 => { cpu.registers.c = alu::srl(&mut cpu.registers, cpu.registers.c); Executed(8) }, //SRL C
-    0x3A => { cpu.registers.d = alu::srl(&mut cpu.registers, cpu.registers.d); Executed(8) }, //SRL D
-    0x3B => { cpu.registers.e = alu::srl(&mut cpu.registers, cpu.registers.e); Executed(8) }, //SRL E
-    0x3C => { cpu.registers.h = alu::srl(&mut cpu.registers, cpu.registers.h); Executed(8) }, //SRL H
-    0x3D => { cpu.registers.l = alu::srl(&mut cpu.registers, cpu.registers.l); Executed(8) }, //SRL L
-    0x3E => { let new_value = alu::srl(&mut cpu.registers, cpu.mmu.read_byte(cpu.registers.get_hl())); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SRL (HL)
-    0x3F => { cpu.registers.a = alu::srl(&mut cpu.registers, cpu.registers.a); Executed(8) }, //SRL A
-    0x40 => { alu::bit(&mut cpu.registers, 0, cpu.registers.b); Executed(8) }, //BIT 0,B
-    0x41 => { alu::bit(&mut cpu.registers, 0, cpu.registers.c); Executed(8) }, //BIT 0,C
-    0x42 => { alu::bit(&mut cpu.registers, 0, cpu.registers.d); Executed(8) }, //BIT 0,D
-    0x43 => { alu::bit(&mut cpu.registers, 0, cpu.registers.e); Executed(8) }, //BIT 0,E
-    0x44 => { alu::bit(&mut cpu.registers, 0, cpu.registers.h); Executed(8) }, //BIT 0,H
-    0x45 => { alu::bit(&mut cpu.registers, 0, cpu.registers.l); Executed(8) }, //BIT 0,L
-    0x46 => { alu::bit(&mut cpu.registers, 0, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 0,(HL)
-    0x47 => { alu::bit(&mut cpu.registers, 0, cpu.registers.a); Executed(8) }, //BIT 0,A
-    0x48 => { alu::bit(&mut cpu.registers, 1, cpu.registers.b); Executed(8) }, //BIT 1,B
-    0x49 => { alu::bit(&mut cpu.registers, 1, cpu.registers.c); Executed(8) }, //BIT 1,C
-    0x4A => { alu::bit(&mut cpu.registers, 1, cpu.registers.d); Executed(8) }, //BIT 1,D
-    0x4B => { alu::bit(&mut cpu.registers, 1, cpu.registers.e); Executed(8) }, //BIT 1,E
-    0x4C => { alu::bit(&mut cpu.registers, 1, cpu.registers.h); Executed(8) }, //BIT 1,H
-    0x4D => { alu::bit(&mut cpu.registers, 1, cpu.registers.l); Executed(8) }, //BIT 1,L
-    0x4E => { alu::bit(&mut cpu.registers, 1, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 1,(HL)
-    0x4F => { alu::bit(&mut cpu.registers, 1, cpu.registers.a); Executed(8) }, //BIT 1,A
-    0x50 => { alu::bit(&mut cpu.registers, 2, cpu.registers.b); Executed(8) }, //BIT 2,B
-    0x51 => { alu::bit(&mut cpu.registers, 2, cpu.registers.c); Executed(8) }, //BIT 2,C
-    0x52 => { alu::bit(&mut cpu.registers, 2, cpu.registers.d); Executed(8) }, //BIT 2,D
-    0x53 => { alu::bit(&mut cpu.registers, 2, cpu.registers.e); Executed(8) }, //BIT 2,E
-    0x54 => { alu::bit(&mut cpu.registers, 2, cpu.registers.h); Executed(8) }, //BIT 2,H
-    0x55 => { alu::bit(&mut cpu.registers, 2, cpu.registers.l); Executed(8) }, //BIT 2,L
-    0x56 => { alu::bit(&mut cpu.registers, 2, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 2,(HL)
-    0x57 => { alu::bit(&mut cpu.registers, 2, cpu.registers.a); Executed(8) }, //BIT 2,A
-    0x58 => { alu::bit(&mut cpu.registers, 3, cpu.registers.b); Executed(8) }, //BIT 3,B
-    0x59 => { alu::bit(&mut cpu.registers, 3, cpu.registers.c); Executed(8) }, //BIT 3,C
-    0x5A => { alu::bit(&mut cpu.registers, 3, cpu.registers.d); Executed(8) }, //BIT 3,D
-    0x5B => { alu::bit(&mut cpu.registers, 3, cpu.registers.e); Executed(8) }, //BIT 3,E
-    0x5C => { alu::bit(&mut cpu.registers, 3, cpu.registers.h); Executed(8) }, //BIT 3,H
-    0x5D => { alu::bit(&mut cpu.registers, 3, cpu.registers.l); Executed(8) }, //BIT 3,L
-    0x5E => { alu::bit(&mut cpu.registers, 3, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 3,(HL)
-    0x5F => { alu::bit(&mut cpu.registers, 3, cpu.registers.a); Executed(8) }, //BIT 3,A
-    0x60 => { alu::bit(&mut cpu.registers, 4, cpu.registers.b); Executed(8) }, //BIT 4,B
-    0x61 => { alu::bit(&mut cpu.registers, 4, cpu.registers.c); Executed(8) }, //BIT 4,C
-    0x62 => { alu::bit(&mut cpu.registers, 4, cpu.registers.d); Executed(8) }, //BIT 4,D
-    0x63 => { alu::bit(&mut cpu.registers, 4, cpu.registers.e); Executed(8) }, //BIT 4,E
-    0x64 => { alu::bit(&mut cpu.registers, 4, cpu.registers.h); Executed(8) }, //BIT 4,H
-    0x65 => { alu::bit(&mut cpu.registers, 4, cpu.registers.l); Executed(8) }, //BIT 4,L
-    0x66 => { alu::bit(&mut cpu.registers, 4, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 4,(HL)
-    0x67 => { alu::bit(&mut cpu.registers, 4, cpu.registers.a); Executed(8) }, //BIT 4,A
-    0x68 => { alu::bit(&mut cpu.registers, 5, cpu.registers.b); Executed(8) }, //BIT 5,B
-    0x69 => { alu::bit(&mut cpu.registers, 5, cpu.registers.c); Executed(8) }, //BIT 5,C
-    0x6A => { alu::bit(&mut cpu.registers, 5, cpu.registers.d); Executed(8) }, //BIT 5,D
-    0x6B => { alu::bit(&mut cpu.registers, 5, cpu.registers.e); Executed(8) }, //BIT 5,E
-    0x6C => { alu::bit(&mut cpu.registers, 5, cpu.registers.h); Executed(8) }, //BIT 5,H
-    0x6D => { alu::bit(&mut cpu.registers, 5, cpu.registers.l); Executed(8) }, //BIT 5,L
-    0x6E => { alu::bit(&mut cpu.registers, 5, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 5,(HL)
-    0x6F => { alu::bit(&mut cpu.registers, 5, cpu.registers.a); Executed(8) }, //BIT 5,A
-    0x70 => { alu::bit(&mut cpu.registers, 6, cpu.registers.b); Executed(8) }, //BIT 6,B
-    0x71 => { alu::bit(&mut cpu.registers, 6, cpu.registers.c); Executed(8) }, //BIT 6,C
-    0x72 => { alu::bit(&mut cpu.registers, 6, cpu.registers.d); Executed(8) }, //BIT 6,D
-    0x73 => { alu::bit(&mut cpu.registers, 6, cpu.registers.e); Executed(8) }, //BIT 6,E
-    0x74 => { alu::bit(&mut cpu.registers, 6, cpu.registers.h); Executed(8) }, //BIT 6,H
-    0x75 => { alu::bit(&mut cpu.registers, 6, cpu.registers.l); Executed(8) }, //BIT 6,L
-    0x76 => { alu::bit(&mut cpu.registers, 6, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 6,(HL)
-    0x77 => { alu::bit(&mut cpu.registers, 6, cpu.registers.a); Executed(8) }, //BIT 6,A
-    0x78 => { alu::bit(&mut cpu.registers, 7, cpu.registers.b); Executed(8) }, //BIT 7,B
-    0x79 => { alu::bit(&mut cpu.registers, 7, cpu.registers.c); Executed(8) }, //BIT 7,C
-    0x7A => { alu::bit(&mut cpu.registers, 7, cpu.registers.d); Executed(8) }, //BIT 7,D
-    0x7B => { alu::bit(&mut cpu.registers, 7, cpu.registers.e); Executed(8) }, //BIT 7,E
-    0x7C => { alu::bit(&mut cpu.registers, 7, cpu.registers.h); Executed(8) }, //BIT 7,H
-    0x7D => { alu::bit(&mut cpu.registers, 7, cpu.registers.l); Executed(8) }, //BIT 7,L
-    0x7E => { alu::bit(&mut cpu.registers, 7, cpu.mmu.read_byte(cpu.registers.get_hl())); Executed(8) }, //BIT 7,(HL)
-    0x7F => { alu::bit(&mut cpu.registers, 7, cpu.registers.a); Executed(8) }, //BIT 7,A
+    0x00 => { cpu.execute(alu::rlc, RegisterName8::B); Executed(8) }, //RLC B
+    0x01 => { cpu.execute(alu::rlc, RegisterName8::C); Executed(8) }, //RLC C
+    0x02 => { cpu.execute(alu::rlc, RegisterName8::D); Executed(8) }, //RLC D
+    0x03 => { cpu.execute(alu::rlc, RegisterName8::E); Executed(8) }, //RLC E
+    0x04 => { cpu.execute(alu::rlc, RegisterName8::H); Executed(8) }, //RLC H
+    0x05 => { cpu.execute(alu::rlc, RegisterName8::L); Executed(8) }, //RLC L
+    0x06 => { cpu.execute_hl(alu::rlc); Executed(8) }, //RLC (HL)
+    0x07 => { cpu.execute(alu::rlc, RegisterName8::A); Executed(8) }, //RLC A
+    0x08 => { cpu.execute(alu::rrc, RegisterName8::B); Executed(8) }, //RRC B
+    0x09 => { cpu.execute(alu::rrc, RegisterName8::C); Executed(8) }, //RRC C
+    0x0A => { cpu.execute(alu::rrc, RegisterName8::D); Executed(8) }, //RRC D
+    0x0B => { cpu.execute(alu::rrc, RegisterName8::E); Executed(8) }, //RRC E
+    0x0C => { cpu.execute(alu::rrc, RegisterName8::H); Executed(8) }, //RRC H
+    0x0D => { cpu.execute(alu::rrc, RegisterName8::L); Executed(8) }, //RRC L
+    0x0E => { cpu.execute_hl(alu::rrc); Executed(8) }, //RRC (HL)
+    0x0F => { cpu.execute(alu::rrc, RegisterName8::A); Executed(8) }, //RRC A
+    0x10 => { cpu.execute(alu::rl, RegisterName8::B); Executed(8) }, //RL B
+    0x11 => { cpu.execute(alu::rl, RegisterName8::C); Executed(8) }, //RL C
+    0x12 => { cpu.execute(alu::rl, RegisterName8::D); Executed(8) }, //RL D
+    0x13 => { cpu.execute(alu::rl, RegisterName8::E); Executed(8) }, //RL E
+    0x14 => { cpu.execute(alu::rl, RegisterName8::H); Executed(8) }, //RL H
+    0x15 => { cpu.execute(alu::rl, RegisterName8::L); Executed(8) }, //RL L
+    0x16 => { cpu.execute_hl(alu::rl); Executed(8) }, //RL (HL)
+    0x17 => { cpu.execute(alu::rl, RegisterName8::A); Executed(8) }, //RL A
+    0x18 => { cpu.execute(alu::rr, RegisterName8::B); Executed(8) }, //RR B
+    0x19 => { cpu.execute(alu::rr, RegisterName8::C); Executed(8) }, //RR C
+    0x1A => { cpu.execute(alu::rr, RegisterName8::D); Executed(8) }, //RR D
+    0x1B => { cpu.execute(alu::rr, RegisterName8::E); Executed(8) }, //RR E
+    0x1C => { cpu.execute(alu::rr, RegisterName8::H); Executed(8) }, //RR H
+    0x1D => { cpu.execute(alu::rr, RegisterName8::L); Executed(8) }, //RR L
+    0x1E => { cpu.execute_hl(alu::rr); Executed(8) }, //RR (HL)
+    0x1F => { cpu.execute(alu::rr, RegisterName8::A); Executed(8) }, //RR A
+    0x20 => { cpu.execute(alu::sla, RegisterName8::B); Executed(8) }, //SLA B
+    0x21 => { cpu.execute(alu::sla, RegisterName8::C); Executed(8) }, //SLA C
+    0x22 => { cpu.execute(alu::sla, RegisterName8::D); Executed(8) }, //SLA D
+    0x23 => { cpu.execute(alu::sla, RegisterName8::E); Executed(8) }, //SLA E
+    0x24 => { cpu.execute(alu::sla, RegisterName8::H); Executed(8) }, //SLA H
+    0x25 => { cpu.execute(alu::sla, RegisterName8::L); Executed(8) }, //SLA L
+    0x26 => { cpu.execute_hl(alu::sla); Executed(8) }, //SLA (HL)
+    0x27 => { cpu.execute(alu::sla, RegisterName8::A); Executed(8) }, //SLA A
+    0x28 => { cpu.execute(alu::sra, RegisterName8::B); Executed(8) }, //SRA B
+    0x29 => { cpu.execute(alu::sra, RegisterName8::C); Executed(8) }, //SRA C
+    0x2A => { cpu.execute(alu::sra, RegisterName8::D); Executed(8) }, //SRA D
+    0x2B => { cpu.execute(alu::sra, RegisterName8::E); Executed(8) }, //SRA E
+    0x2C => { cpu.execute(alu::sra, RegisterName8::H); Executed(8) }, //SRA H
+    0x2D => { cpu.execute(alu::sra, RegisterName8::L); Executed(8) }, //SRA L
+    0x2E => { cpu.execute_hl(alu::sra); Executed(8) }, //SRA (HL)
+    0x2F => { cpu.execute(alu::sra, RegisterName8::A); Executed(8) }, //SRA A
+    0x30 => { cpu.execute(alu::swap, RegisterName8::B); Executed(8) }, //SWAP B
+    0x31 => { cpu.execute(alu::swap, RegisterName8::C); Executed(8) }, //SWAP C
+    0x32 => { cpu.execute(alu::swap, RegisterName8::D); Executed(8) }, //SWAP D
+    0x33 => { cpu.execute(alu::swap, RegisterName8::E); Executed(8) }, //SWAP E
+    0x34 => { cpu.execute(alu::swap, RegisterName8::H); Executed(8) }, //SWAP H
+    0x35 => { cpu.execute(alu::swap, RegisterName8::L); Executed(8) }, //SWAP L
+    0x36 => { cpu.execute_hl(alu::swap); Executed(8) }, //SWAP (HL)
+    0x37 => { cpu.execute(alu::swap, RegisterName8::A); Executed(8) }, //SWAP A
+    0x38 => { cpu.execute(alu::srl, RegisterName8::B); Executed(8) }, //SRL B
+    0x39 => { cpu.execute(alu::srl, RegisterName8::C); Executed(8) }, //SRL C
+    0x3A => { cpu.execute(alu::srl, RegisterName8::D); Executed(8) }, //SRL D
+    0x3B => { cpu.execute(alu::srl, RegisterName8::E); Executed(8) }, //SRL E
+    0x3C => { cpu.execute(alu::srl, RegisterName8::H); Executed(8) }, //SRL H
+    0x3D => { cpu.execute(alu::srl, RegisterName8::L); Executed(8) }, //SRL L
+    0x3E => { cpu.execute_hl(alu::srl); Executed(8) }, //SRL (HL)
+    0x3F => { cpu.execute(alu::srl, RegisterName8::A); Executed(8) }, //SRL A
+    0x40 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,B
+    0x41 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,C
+    0x42 => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,D
+    0x43 => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,E
+    0x44 => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,H
+    0x45 => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,L
+    0x46 => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,(HL)
+    0x47 => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 0, value); Executed(8) }, //BIT 0,A
+    0x48 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,B
+    0x49 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,C
+    0x4A => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,D
+    0x4B => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,E
+    0x4C => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,H
+    0x4D => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,L
+    0x4E => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,(HL)
+    0x4F => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 1, value); Executed(8) }, //BIT 1,A
+    0x50 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,B
+    0x51 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,C
+    0x52 => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,D
+    0x53 => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,E
+    0x54 => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,H
+    0x55 => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,L
+    0x56 => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,(HL)
+    0x57 => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 2, value); Executed(8) }, //BIT 2,A
+    0x58 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,B
+    0x59 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,C
+    0x5A => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,D
+    0x5B => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,E
+    0x5C => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,H
+    0x5D => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,L
+    0x5E => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,(HL)
+    0x5F => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 3, value); Executed(8) }, //BIT 3,A
+    0x60 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,B
+    0x61 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,C
+    0x62 => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,D
+    0x63 => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,E
+    0x64 => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,H
+    0x65 => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,L
+    0x66 => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,(HL)
+    0x67 => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 4, value); Executed(8) }, //BIT 4,A
+    0x68 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,B
+    0x69 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,C
+    0x6A => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,D
+    0x6B => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,E
+    0x6C => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,H
+    0x6D => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,L
+    0x6E => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,(HL)
+    0x6F => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 5, value); Executed(8) }, //BIT 5,A
+    0x70 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,B
+    0x71 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,C
+    0x72 => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,D
+    0x73 => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,E
+    0x74 => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,H
+    0x75 => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,L
+    0x76 => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,(HL)
+    0x77 => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 6, value); Executed(8) }, //BIT 6,A
+    0x78 => { let value = cpu.registers.b; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,B
+    0x79 => { let value = cpu.registers.c; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,C
+    0x7A => { let value = cpu.registers.d; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,D
+    0x7B => { let value = cpu.registers.e; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,E
+    0x7C => { let value = cpu.registers.h; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,H
+    0x7D => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,L
+    0x7E => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,(HL)
+    0x7F => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,A
     0x80 => { cpu.registers.b = cpu.registers.b & !(1 << 0); Executed(8) }, //RES 0,B
     0x81 => { cpu.registers.c = cpu.registers.c & !(1 << 0); Executed(8) }, //RES 0,C
     0x82 => { cpu.registers.d = cpu.registers.d & !(1 << 0); Executed(8) }, //RES 0,D
@@ -262,6 +262,5 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0xFD => { cpu.registers.l = cpu.registers.l | (1 << 7); Executed(8) }, //SET 7,L
     0xFE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 7); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 7,(HL)
     0xFF => { cpu.registers.a = cpu.registers.a | (1 << 7); Executed(8) }, //SET 7,A
-    _ => UnknownOpCode
   }
 }
