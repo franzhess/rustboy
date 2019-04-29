@@ -3,7 +3,7 @@ mod alu;
 mod op_codes;
 mod op_codes_cb;
 
-use crate::mmu::MMU;
+use crate::mmu::Mmu;
 use crate::GBKeyEvent;
 use crate::cpu::registers::{Registers, RegisterName8, RegisterName16, FlagRegister};
 
@@ -18,17 +18,17 @@ type BinaryOperation16 = fn(&mut FlagRegister, u16, u16) -> u16;
 
 pub struct Cpu {
   registers: Registers,
-  mmu: MMU,
+  mmu: Mmu,
   halted: bool,
   ime: bool, // interrupt master enable - set by DI and EI
   ei_requested: usize, //EI has one cycle delay
 }
 
 impl Cpu {
-  pub fn new(buffer: [u8; 0xFFFF]) -> Cpu {
+  pub fn new(file_name: &str) -> Cpu {
     Cpu {
       registers: Registers::new(),
-      mmu: MMU::new(buffer),
+      mmu: Mmu::new(file_name),
       halted: false,
       ime: false, //interrupt master enable
       ei_requested: 0, //enable interrupt requested - in the original gameboy the enabling of the interrupts took two cycles (see tick)

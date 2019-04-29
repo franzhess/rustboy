@@ -14,6 +14,7 @@ use std::time::{Instant, Duration};
 use crate::cpu::Cpu;
 use std::fs;
 use std::io::Read;
+use std::thread::sleep;
 
 #[derive(Debug)]
 pub enum GBEvent {
@@ -45,18 +46,11 @@ pub struct GBKeyEvent {
   pub state: GBKeyState
 }
 
-pub fn create_cpu(rom_file_name: &str) -> Cpu {
-  let mut rom = fs::File::open(rom_file_name).unwrap();
-  let mut buffer: [u8;0xFFFF] = [0; 0xFFFF];
-
-  rom.read(&mut buffer).unwrap();
-  Cpu::new(buffer)
-}
-
 pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
-  let mut last_update = Instant::now();
-  let mut ticks: usize = 0;
-  let one_second = Duration::from_secs(1);
+  let mut last_frame = Instant::now();
+  let one_frame = Duration::from_micros(16666); //60Hz
+  let mut ticks_per_frame : usize = 0;
+  let target_ticks_per_frame = 4194304 as usize / 60 as usize; //4.194304 MHz
 
   'running: loop {
     for event in input_receiver.try_iter() {
@@ -66,16 +60,16 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender:
       }
     }
 
-    ticks += cpu.tick();
+    ticks_per_frame += cpu.tick();
 
     if cpu.get_screen_updated() {
       screen_sender.send(cpu.get_screen_buffer()).expect("failed to send video data!");
     }
 
-    if last_update.elapsed() >= one_second {
-      println!("{} ticks", ticks);
-      ticks = 0;
-      last_update = Instant::now();
+    if ticks_per_frame >= target_ticks_per_frame && last_frame.elapsed() < one_frame {
+      sleep(one_frame - last_frame.elapsed());
+      ticks_per_frame = 0;
+      last_frame = Instant::now();
     }
   }
 }

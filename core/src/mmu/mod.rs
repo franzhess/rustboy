@@ -7,39 +7,33 @@ use crate::mmu::joypad::Joypad;
 use crate::mmu::gpu::GPU;
 use crate::mmu::timer::Timer;
 use crate::VOAM_SIZE;
+use crate::mbc::{load_rom, Mbc};
 
-const ADDR_TITLE_START: usize = 0x0134;
-const ADDR_TITLE_END: usize = 0x0142;
-const ADDR_CARTRIDGE_TYPE: usize = 0x0147;
+const WRAM_SIZE: usize = 0x8000;
+const HRAM_SIZE: usize = 0x7F;
 
-pub struct MMU {
-  buffer: [u8; 0xFFFF],
+pub struct Mmu {
+  wram: [u8; WRAM_SIZE],
+  hram: [u8; HRAM_SIZE],
   gpu: GPU,
   timer: Timer,
   pub joypad: Joypad,
+  mbc: Box<Mbc+'static>,
   interrupt_enable: u8,
   interrupt_request: u8,
 }
 
-impl MMU {
-  pub fn new(buffer: [u8; 0xFFFF]) -> MMU {
-    println!("Title: {}", str::from_utf8(&buffer[ADDR_TITLE_START..ADDR_TITLE_END]).unwrap());
+impl Mmu {
+  pub fn new(file_name: &str) -> Mmu {
+    let rom = load_rom(file_name).unwrap();
 
-    let cartridge_type = match buffer[ADDR_CARTRIDGE_TYPE] {
-      0x00 => "MBC0",
-      0x01...0x03 => "MBC1",
-      0x0F...0x13 => "MBC3",
-      0x19...0x1E => "MBC5",
-      _ => "UNSUPPORTED"
-    };
-
-    println!("Cartridge type: {}", cartridge_type);
-
-    MMU {
-      buffer,
+    Mmu {
+      wram: [0; WRAM_SIZE],
+      hram: [0; HRAM_SIZE],
       gpu: GPU::new(),
       timer: Timer::new(),
       joypad: Joypad::new(),
+      mbc: rom,
       interrupt_enable: 0x00,
       interrupt_request: 0x00
     }
@@ -47,22 +41,23 @@ impl MMU {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
-      0x0000 ... 0x7FFF => self.buffer[address as usize], //ROM from cartridge
+      0x0000 ... 0x7FFF => self.mbc.read_rom(address), //ROM from cartridge
       0x8000 ... 0x9FFF => self.gpu.read_byte(address), //VRAM
-      0xC000 ... 0xDFFF => self.buffer[address as usize], //WRAM
+      0xA000 ... 0xBFFF => self.mbc.read_ram(address),
+      0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000], //WRAM
+      0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000], //WRAM Echo
       0xFE00 ... 0xFE9F => self.gpu.read_byte(address), //OAM
       0xFEA0 ... 0xFEFF => 0, //not useable
       0xFF00 => self.joypad.read(), //Joypad
+      0xFF01 ... 0xFF02 => 0, //serial
       0xFF04 ... 0xFF07 => self.timer.read_byte(address), //TIMER
       0xFF0F => self.interrupt_request,
+      0xFF10 ... 0xFF3F => 0, //sound
       0xFF46 => 0,
       0xFF40 ... 0xFF4B => self.gpu.read_byte(address),
-      0xFF80 ... 0xFFFE => self.buffer[address as usize], //HRAM
+      0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
       0xFFFF => self.interrupt_enable,
-      _ => {
-        //println!("Read through to unmapped memory address: {:#06X}", address);
-        self.buffer[address as usize]
-      }
+      _ => 0
     }
   }
 
@@ -72,22 +67,23 @@ impl MMU {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0x0000 ... 0x7FFF => self.buffer[address as usize] = value, //ROM cartridge
+      0x0000 ... 0x7FFF => self.mbc.write_rom(address, value), //ROM cartridge
       0x8000 ... 0x9FFF => self.gpu.write_byte(address, value), //VRAM
-      0xC000 ... 0xDFFF => self.buffer[address as usize] = value, //WRAM
+      0xA000 ... 0xBFFF => self.mbc.write_ram(address, value),
+      0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000] = value, //WRAM
+      0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000] = value, //WRAM Echo
       0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value), //OAM
       0xFEA0 ... 0xFEFF => (), //not useable
       0xFF00 => self.joypad.write(value), //JOYPAD
+      0xFF01 ... 0xFF02 => (), //serial
       0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
+      0xFF10 ... 0xFF3F => (), //sound
       0xFF46 => self.copy_to_voam(value),
       0xFF40 ... 0xFF4B => self.gpu.write_byte(address, value),
-      0xFF80 ... 0xFFFE => self.buffer[address as usize] = value, //HRAM
+      0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
-      _ => {
-        //println!("Write through to unmapped memory address: {:#06X}", address);
-        self.buffer[address as usize] = value;
-      }
+      _ => {}
     }
   }
 
