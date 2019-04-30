@@ -1,9 +1,10 @@
-pub mod mbc;
 pub mod cpu;
-pub mod mmu;
 
-pub const VRAM_SIZE: usize = 0x2000; //8kB vram
-pub const VOAM_SIZE: usize = 0xA0;
+mod mbc;
+mod mmu;
+mod joypad;
+mod timer;
+mod gpu;
 
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;

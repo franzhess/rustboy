@@ -1,7 +1,8 @@
 use crate::SCREEN_WIDTH;
 use crate::SCREEN_HEIGHT;
-use crate::VRAM_SIZE;
-use crate::VOAM_SIZE;
+
+pub const VRAM_SIZE: usize = 0x2000; //8kB vram
+pub const VOAM_SIZE: usize = 0xA0;
 
 pub struct GPU {
   pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],

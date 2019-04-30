@@ -1,13 +1,9 @@
-pub mod joypad;
-pub mod timer;
-mod gpu;
-
 use std::str;
-use crate::mmu::joypad::Joypad;
-use crate::mmu::gpu::GPU;
-use crate::mmu::timer::Timer;
-use crate::VOAM_SIZE;
+use crate::joypad::Joypad;
+use crate::timer::Timer;
+use crate::gpu::VOAM_SIZE;
 use crate::mbc::{load_rom, Mbc};
+use crate::gpu::GPU;
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
