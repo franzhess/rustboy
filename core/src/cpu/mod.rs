@@ -117,11 +117,13 @@ impl Cpu {
 
   fn push(&mut self, value: u16) {
     self.registers.sp -= 2; //stack grows down from 0xFFFE and stores words
+    //println!("pushing {:06X} to   {:06X}", value, self.registers.sp);
     self.mmu.write_word(self.registers.sp, value);
   }
 
   fn pop(&mut self) -> u16 {
     let result = self.mmu.read_word(self.registers.sp);
+    //println!("popping {:06X} from {:06X}", result, self.registers.sp);
     self.registers.sp += 2;
     result
   }

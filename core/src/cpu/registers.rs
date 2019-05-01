@@ -43,6 +43,7 @@ pub trait FlagRegister {
   fn get_flag(&self, cpu_flag: CpuFlag) -> bool;
   fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool);
   fn reset_flags(&mut self);
+  fn get_raw(&self) -> u8;
 }
 
 impl Registers {
@@ -124,6 +125,7 @@ impl Registers {
 
   pub fn set_af(&mut self, w: u16) {
     self.a = (w >> 8) as u8;
+    self.f = w as u8 & 0xF0; //only the upper 4 bits of f can be written to
   }
 
   pub fn set_bc(&mut self, w: u16) {
@@ -159,6 +161,8 @@ impl FlagRegister for Registers {
   fn reset_flags(&mut self) {
     self.f = 0x00;
   }
+
+  fn get_raw(&self) -> u8 { self.f }
 }
 
 #[cfg(test)]

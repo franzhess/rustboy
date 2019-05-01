@@ -57,8 +57,8 @@ pub fn add(flag_register: &mut FlagRegister, value1: u8, value2: u8) -> u8 {
 pub fn add16(flag_register: &mut FlagRegister, value1: u16, value2: u16) -> u16 {
   let result = value1.wrapping_add(value2);
   flag_register.set_flag(CpuFlag::N, false);
-  flag_register.set_flag(CpuFlag::H, (((value1 & 0x00FF) + (value2 & 0x00FF)) & 0x0100) == 0x0100);
-  flag_register.set_flag(CpuFlag::C, value1 as usize + value2 as usize > 0xFFFF);
+  flag_register.set_flag(CpuFlag::H, ((value1 & 0x07FF) + (value2 & 0x07FF)) > 0x07FF);
+  flag_register.set_flag(CpuFlag::C, value1 > 0xFFFF - value2);
   result
 }
 
@@ -93,6 +93,7 @@ pub fn sbc(flag_register: &mut FlagRegister, value1: u8, value2: u8) -> u8 {
 
 pub fn cp(flag_register: &mut FlagRegister, value1: u8, value2: u8) -> u8 {
   sub(flag_register, value1, value2);
+  //println!("CP {:#4X} - {:#4X} - flags: {:08b}", value1, value2, flag_register.get_raw());
   value1
 }
 

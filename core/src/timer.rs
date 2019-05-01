@@ -73,7 +73,7 @@ impl Timer {
     self.divide_ticks += ticks;
     while self.divide_ticks >= 256 {
       self.divide_ticks -= 256;
-      self.divide = if self.divide == 0xFF { 0x00 } else { self.divide + 1 };
+      self.divide = self.divide.wrapping_add(1);
     }
 
     if self.timer_enabled {

@@ -7,6 +7,7 @@ use crate::cpu::Cpu;
 use crate::cpu::op_codes_cb;
 
 pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
+  //println!("Executing OP Code: {:#04X}", op_code);
   match op_code {
     0x00 => { Executed(4) }, //NOOP
     0x01 => { let next_word = cpu.fetch_word(); cpu.registers.set_bc(next_word); Executed(12) }, //LD BC,nn
