@@ -5,6 +5,7 @@ mod mmu;
 mod joypad;
 mod timer;
 mod gpu;
+mod serial;
 
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
@@ -13,8 +14,6 @@ use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Instant, Duration};
 
 use crate::cpu::Cpu;
-use std::fs;
-use std::io::Read;
 use std::thread::sleep;
 
 #[derive(Debug)]

@@ -17,15 +17,15 @@ impl Mbc for Mbc0 {
     self.rom[address as usize]
   }
 
-  fn read_ram(&self, address: u16) -> u8 {
+  fn read_ram(&self, _address: u16) -> u8 {
     0
   }
 
-  fn write_rom(&mut self, address: u16, value: u8) {
+  fn write_rom(&mut self, _address: u16, _value: u8) {
     ()
   }
 
-  fn write_ram(&mut self, address: u16, value: u8) {
+  fn write_ram(&mut self, _address: u16, _value: u8) {
     ()
   }
 }

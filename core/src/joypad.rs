@@ -52,14 +52,6 @@ impl Joypad {
     else if (!value & 0x10) == 0x10 { self.selector = false; }
   }
 
-  pub fn set_state(&mut self, new_state: [bool; 8]) {
-    for i in 0..8 {
-      self.irq_joypad |= !self.state[i] && new_state[i]; //we fire an irq when a button was pressed
-    }
-
-    self.state = new_state;
-  }
-
   pub fn receive_event(&mut self, event: GBKeyEvent) {
     let key_index = event.key_code as usize;
     self.irq_joypad |= !self.state[key_index] && event.state == GBKeyState::KeyDown;

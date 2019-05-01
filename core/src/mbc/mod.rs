@@ -1,8 +1,12 @@
 mod mbc0;
+mod mbc1;
+mod mbc3;
+mod mbc5;
 
 use std::fs::File;
 use std::io::Read;
 use crate::mbc::mbc0::Mbc0;
+use crate::mbc::mbc1::Mbc1;
 
 const ADDR_TITLE_START: u16 = 0x0134;
 const TITLE_SIZE: u16 = 16;
@@ -27,16 +31,16 @@ pub trait Mbc : Send {
   }
 }
 
-pub fn load_rom(file_name: &str) -> Result<Box<Mbc+'static>, &str> {
+pub fn load_rom(file_name: &str) -> Box<Mbc+'static> {
   let mut buffer = vec![];
   let mut f = File::open(file_name).unwrap();
-  f.read_to_end(&mut buffer);
+  f.read_to_end(&mut buffer).expect("Error reading ROM!");
 
   match buffer[ADDR_CARTRIDGE_TYPE] {
-    0x00 => Ok(Box::new(Mbc0::new(buffer))),
-    //0x01...0x03 => "MBC1",
+    0x00 => Box::new(Mbc0::new(buffer)),
+    0x01...0x03 => Box::new(Mbc1::new(buffer)),
     //0x0F...0x13 => "MBC3",
     //0x19...0x1E => "MBC5",
-    _ => Err("Unsupported cartridge type")
+    _ => panic!("Unsupported cartridge type")
   }
 }
