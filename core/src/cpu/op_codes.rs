@@ -16,7 +16,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0x04 => { cpu.execute(alu::inc, RegisterName8::B); Executed(4) }, //INC B
     0x05 => { cpu.execute(alu::dec, RegisterName8::B); Executed(4) }, //DEC B
     0x06 => { cpu.registers.b = cpu.fetch_byte(); Executed(8) }, //LD B,n
-    0x07 => { cpu.execute(alu::rlc, RegisterName8::A); Executed(4) }, //RLC A - rotate left a
+    0x07 => { cpu.execute(alu::rlca, RegisterName8::A); Executed(4) }, //RLC A - rotate left a
     0x08 => { let address = cpu.fetch_word(); cpu.mmu.write_word(address, cpu.registers.sp); Executed(20) }, //LD (nn),SP
     0x09 => { cpu.execute16(alu::add16, RegisterName16::BC); Executed(8) }, //ADD HL,BC
     0x0A => { cpu.registers.a = cpu.mmu.read_byte(cpu.registers.get_bc()); Executed(8) }, //LD A,(BC)
@@ -24,7 +24,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0x0C => { cpu.execute(alu::inc, RegisterName8::C); Executed(4) }, //INC C
     0x0D => { cpu.execute(alu::dec, RegisterName8::C); Executed(4) }, //DEC C
     0x0E => { cpu.registers.c = cpu.fetch_byte(); Executed(8) }, //LD C, n
-    0x0F => { cpu.execute(alu::rrc, RegisterName8::A); Executed(4) }, //RRC A
+    0x0F => { cpu.execute(alu::rrca, RegisterName8::A); Executed(4) }, //RRC A
     0x10 => { cpu.fetch_byte(); cpu.halted = true; Executed(4) }, //STOP @TODO implement resume on button press
     0x11 => { let next_word = cpu.fetch_word(); cpu.registers.set_de(next_word); Executed(12) }, //LD DE,nn
     0x12 => { cpu.mmu.write_byte(cpu.registers.get_de(), cpu.registers.a); Executed(8) }, //LD (DE),A
@@ -32,7 +32,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0x14 => { cpu.execute(alu::inc, RegisterName8::D); Executed(4) }, //INC D
     0x15 => { cpu.execute(alu::dec, RegisterName8::D); Executed(4) }, //DEC D
     0x16 => { cpu.registers.d = cpu.fetch_byte(); Executed(8) }, //LD D,n
-    0x17 => { cpu.execute(alu::rl, RegisterName8::A); Executed(4) }, //RL A - rotate left through carry
+    0x17 => { cpu.execute(alu::rla, RegisterName8::A); Executed(4) }, //RL A - rotate left through carry
     0x18 => { cpu.jump_r(); Executed(12) }, //JR n
     0x19 => { cpu.execute16(alu::add16, RegisterName16::DE); Executed(8) }, //ADD HL,DE
     0x1A => { cpu.registers.a = cpu.mmu.read_byte(cpu.registers.get_de()); Executed(8) }, //LD A,(DE)
@@ -40,7 +40,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0x1C => { cpu.execute(alu::inc, RegisterName8::E); Executed(4) }, //INC E
     0x1D => { cpu.execute(alu::dec, RegisterName8::E); Executed(4) }, //DEC E
     0x1E => { cpu.registers.e = cpu.fetch_byte(); Executed(8) }, //LD E,n
-    0x1F => { cpu.execute(alu::rr, RegisterName8::A); Executed(4) }, //RRA
+    0x1F => { cpu.execute(alu::rra, RegisterName8::A); Executed(4) }, //RRA
     0x20 => { if !cpu.registers.get_flag(CpuFlag::Z) { cpu.jump_r(); Executed(12) } else { cpu.registers.pc += 1; Executed(8) } }, //JR NZ,n
     0x21 => { let next_word = cpu.fetch_word(); cpu.registers.set_hl(next_word); Executed(12) }, //LD HL,nn
     0x22 => { cpu.mmu.write_byte(cpu.registers.get_hli(), cpu.registers.a); Executed(12) }, //LD (HL+),A
@@ -223,7 +223,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     //0xD3
     0xD4 => { if !cpu.registers.get_flag(CpuFlag::C) { let address = cpu.fetch_word(); cpu.call(address); Executed(24) } else { cpu.registers.pc += 2; Executed(12) } }, //CALL NC,nn
     0xD5 => { cpu.push(cpu.registers.get_de()); Executed(16) }, //PUSH DE
-    0xD6 => { let next_byte = cpu.fetch_byte(); cpu.execute_binary_with_value(alu::add, next_byte); Executed(8) }, //SUB A,n
+    0xD6 => { let next_byte = cpu.fetch_byte(); cpu.execute_binary_with_value(alu::sub, next_byte); Executed(8) }, //SUB A,n
     0xD7 => { cpu.call(0x0010); Executed(16) }, //RST 10H
     0xD8 => { if cpu.registers.get_flag(CpuFlag::C) { cpu.retrn(); Executed(20) } else { Executed(8) } }, //RET C
     0xD9 => { cpu.ime = true; cpu.retrn(); Executed(16) }, //RETI (return and enable interrupts)

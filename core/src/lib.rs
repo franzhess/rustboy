@@ -66,8 +66,14 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender:
       screen_sender.send(cpu.get_screen_buffer()).expect("failed to send video data!");
     }
 
-    if ticks_per_frame >= target_ticks_per_frame && last_frame.elapsed() < one_frame {
-      sleep(one_frame - last_frame.elapsed());
+    if last_frame.elapsed() < one_frame {
+      if ticks_per_frame >= target_ticks_per_frame {
+        sleep(one_frame - last_frame.elapsed());
+        ticks_per_frame = 0;
+        last_frame = Instant::now();
+      }
+    } else {
+      println!("CPU slow! {} ticks should be {}", ticks_per_frame, target_ticks_per_frame);
       ticks_per_frame = 0;
       last_frame = Instant::now();
     }

@@ -41,6 +41,6 @@ pub fn load_rom(file_name: &str) -> Box<Mbc+'static> {
     0x01...0x03 => Box::new(Mbc1::new(buffer)),
     //0x0F...0x13 => "MBC3",
     //0x19...0x1E => "MBC5",
-    _ => panic!("Unsupported cartridge type")
+    v => panic!("Unsupported cartridge type {:#02X}", v)
   }
 }

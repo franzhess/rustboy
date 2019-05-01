@@ -266,14 +266,13 @@ impl GPU {
 
         let line = self.line as usize + 16;
         if y > 0 && y < 160 && x > 0 && x < 168 { //otherwise the sprite is hidden @TODO sprite ordering by x coordinate
-          if line > y  && line < (y + self.sprite_size) {
+          if line >= y  && line < (y + self.sprite_size) {
             let sprite_id = self.voam[sprite_address + 2];
             let sprite_attributes = self.voam[sprite_address + 3];
 
             let palette = if sprite_attributes & 0x10 == 0x10 { self.obj_palette_2 } else { self.obj_palette_1 };
             let flip_x = sprite_attributes & 0x20 == 0x20;
             let flip_y = sprite_attributes & 0x40 == 0x40;
-
 
             /*  Bit7   OBJ-to-BG Priority (0=OBJ Above BG, 1=OBJ Behind BG color 1-3)
               (Used for both BG and Window. BG color 0 is always behind OBJ)
@@ -293,7 +292,10 @@ impl GPU {
             for x_offset in 0..8 {
               let pixel = if flip_x { 7 - x_offset } else { x_offset };
               if color[pixel] > 0 {
-                self.screen_buffer[self.line as usize][x + x_offset - 8] = (palette >> color[pixel] * 2) & 0x03;
+                let screen_x = x + x_offset - 8;
+                if screen_x < 160 {
+                  self.screen_buffer[self.line as usize][screen_x] = (palette >> color[pixel] * 2) & 0x03;
+                }
               }
             }
           }

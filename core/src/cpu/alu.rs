@@ -77,7 +77,8 @@ pub fn sub(flag_register: &mut FlagRegister, value1: u8, value2: u8) -> u8 {
   flag_register.set_flag(CpuFlag::Z, result == 0);
   flag_register.set_flag(CpuFlag::N, true);
   flag_register.set_flag(CpuFlag::H, (value1 & 0x0F) < (value2 & 0x0F));
-  flag_register.set_flag(CpuFlag::C, value1 < value2);
+  flag_register.set_flag(CpuFlag::C, (value1 as u16) < (value2 as u16));
+  //println!("{} - {} = {} flags: {:08b}",value1, value2, result, flag_register.get_raw());
   result
 }
 
@@ -87,7 +88,7 @@ pub fn sbc(flag_register: &mut FlagRegister, value1: u8, value2: u8) -> u8 {
   flag_register.set_flag(CpuFlag::Z, result == 0);
   flag_register.set_flag(CpuFlag::N, true);
   flag_register.set_flag(CpuFlag::H, (value1 & 0x0F) < (value2 & 0x0F) + c);
-  flag_register.set_flag(CpuFlag::C, value1 < value2 + c);
+  flag_register.set_flag(CpuFlag::C, (value1 as u16) < (value2 as u16) + (c as u16));
   result
 }
 
@@ -188,7 +189,7 @@ pub fn srl(flag_register: &mut FlagRegister, value: u8) -> u8 { //shift left ari
 pub fn ccf(flag_register: &mut FlagRegister) { //compliment carry flag
   flag_register.set_flag(CpuFlag::N, false);
   flag_register.set_flag(CpuFlag::H, false);
-  flag_register.set_flag(CpuFlag::C, flag_register.get_flag(CpuFlag::C));
+  flag_register.set_flag(CpuFlag::C, !flag_register.get_flag(CpuFlag::C));
 }
 
 pub fn scf(flag_register: &mut FlagRegister) { //set carry flag
@@ -201,4 +202,38 @@ pub fn bit(flag_register: &mut FlagRegister, bit: u8, value: u8) { //check bit a
   flag_register.set_flag(CpuFlag::Z, (value & (1 << bit)) == 0 );
   flag_register.set_flag(CpuFlag::N, false);
   flag_register.set_flag(CpuFlag::H, true);
+}
+
+//rla, rlca, rra and rrca don't set the Z flag - different to the CB instructions
+pub fn rla(flag_register: &mut FlagRegister, value: u8) -> u8 { //rotate left through carry
+  let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
+  let result = (value << 1) | if flag_register.get_flag(CpuFlag::C) { 0x01 } else { 0x00 }; //push one to the right and add the carry to the right
+  shift_operation_flag_update_a(flag_register, new_carry);
+  result
+}
+
+pub fn rlca(flag_register: &mut FlagRegister, value: u8) -> u8 { //rotate left
+  let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
+  let result = (value << 1) | if new_carry { 0x01 } else { 0x00 }; //push one to the left and add the pushed out bit to the right
+  shift_operation_flag_update_a(flag_register, new_carry);
+  result
+}
+
+pub fn rra(flag_register: &mut FlagRegister, value: u8) -> u8 { //rotate right through carry
+  let new_carry = (value & 0x01) == 0x01;
+  let result = (value >> 1) | if flag_register.get_flag(CpuFlag::C) { 0x80 } else { 0x00 };
+  shift_operation_flag_update_a(flag_register, new_carry);
+  result
+}
+
+pub fn rrca(flag_register: &mut FlagRegister, value: u8) -> u8 { //rotate right
+  let new_carry = (value & 0x01) == 0x01;
+  let result = (value >> 1) | if new_carry { 0x80 } else { 0x00 };
+  shift_operation_flag_update_a(flag_register, new_carry);
+  result
+}
+
+pub fn shift_operation_flag_update_a(flag_register: &mut FlagRegister, new_carry: bool) {
+  flag_register.reset_flags();
+  flag_register.set_flag(CpuFlag::C, new_carry);
 }
