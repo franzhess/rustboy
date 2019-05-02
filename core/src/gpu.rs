@@ -260,7 +260,6 @@ impl GPU {
   }
 
   fn render_window(&mut self) {
-    println!("render window");
   }
 
   fn render_sprites(&mut self) {
