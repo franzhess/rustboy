@@ -5,3 +5,4 @@ authors = ["Franz Hess <zylonenoger@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+zip = "0.5.2"
