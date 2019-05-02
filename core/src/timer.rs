@@ -23,7 +23,7 @@ impl Timer {
       timer_ticks: 0,
       timer_modulo: 0,
       timer_enabled: false,
-      timer_steps: 1024
+      timer_steps: 256
     }
   }
 
@@ -47,8 +47,8 @@ impl Timer {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0xFF04 => { self.divide = 0x00; self.divide_ticks = 0; }, //reset on any write
-      0xFF05 => { self.timer_counter = value; self.timer_ticks = 0; },
+      0xFF04 => self.divide = 0x00, //reset on any write
+      0xFF05 => self.timer_counter = value,
       0xFF06 => self.timer_modulo = value,
       0xFF07 => {
         self.timer_enabled = (value & 0x04) == 0x04; //bit 2 is enabled yes/no
@@ -80,11 +80,9 @@ impl Timer {
       self.timer_ticks += ticks;
       while self.timer_ticks >= self.timer_steps {
         self.timer_ticks -= self.timer_steps;
-        self.timer_counter = if self.timer_counter == 0xFF {
-          self.irq_timer = true;
-          self.timer_modulo
-        } else {
-          self.timer_counter + 1
+        self.timer_counter = match self.timer_counter {
+          0xFF => { self.irq_timer = true;  self.timer_modulo },
+          _ => self.timer_counter + 1
         };
       }
     }

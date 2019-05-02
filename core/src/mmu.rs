@@ -19,6 +19,7 @@ pub struct Mmu {
   serial: Serial,
   interrupt_enable: u8,
   interrupt_request: u8,
+  voam_oam: u8,
 }
 
 impl Mmu {
@@ -35,7 +36,8 @@ impl Mmu {
       mbc: rom,
       serial: Serial::new(),
       interrupt_enable: 0x00,
-      interrupt_request: 0x00
+      interrupt_request: 0x00,
+      voam_oam: 0x00,
     }
   }
 
@@ -53,7 +55,7 @@ impl Mmu {
       0xFF04 ... 0xFF07 => self.timer.read_byte(address), //TIMER
       0xFF0F => self.interrupt_request,
       0xFF10 ... 0xFF3F => 0, //sound
-      0xFF46 => 0,
+      0xFF46 => self.voam_oam,
       0xFF40 ... 0xFF4B => self.gpu.read_byte(address),
       0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
       0xFFFF => self.interrupt_enable,
@@ -79,7 +81,7 @@ impl Mmu {
       0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
       0xFF10 ... 0xFF3F => (), //sound
-      0xFF46 => self.copy_to_voam(value),
+      0xFF46 => { self.voam_oam = value; self.copy_to_voam(value) },
       0xFF40 ... 0xFF4B => self.gpu.write_byte(address, value),
       0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
@@ -129,7 +131,7 @@ impl Mmu {
   fn copy_to_voam(&mut self, value: u8) {
     let mem_start = (value as u16) << 8;
     for offset in 0..VOAM_SIZE {
-      self.gpu.write_byte(0xFE00 + offset as u16, self.read_byte(mem_start + offset as u16));
+      self.write_byte(0xFE00 + offset as u16, self.read_byte(mem_start + offset as u16));
     }
   }
 }

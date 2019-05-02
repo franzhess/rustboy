@@ -6,6 +6,7 @@ pub const VOAM_SIZE: usize = 0xA0;
 
 pub struct GPU {
   pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+  color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
   pub screen_update: bool,
 
   pub irq_vblank: bool,
@@ -42,6 +43,7 @@ impl GPU {
   pub fn new() -> GPU {
     GPU {
       screen_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
+      color_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
       screen_update: false,
       irq_vblank: false,
       irq_stat: false,
@@ -160,6 +162,10 @@ impl GPU {
         self.clock -= 456;
         self.line = (self.line + 1) % 154; //154 = 144 physical lines + 10 imaginary vblank lines
 
+        if self.irq_lyc_enable {
+          self.irq_stat = self.line == self.line_compare;
+        }
+
         if self.line >= 144 && self.mode != 1 {
           self.set_mode(1);
         }
@@ -202,12 +208,11 @@ impl GPU {
     //println!("set mode: {}", mode);
     self.mode = mode;
 
-    //@TODO do rendering stuff
     match mode {
-      1 => { self.irq_vblank = true; self.screen_update = true }, //we finished the screen, tell the window to refresh
-      2 => (), //determine visible sprites
+      1 => { if self.irq_m1_enable { self.irq_stat = true; }; self.irq_vblank = true; self.screen_update = true }, //we finished the screen, tell the window to refresh
+      2 => if self.irq_m2_enable { self.irq_stat = true; }, //determine visible sprites
       3 => self.render_line(), //draw the current line
-      _ => () //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
+      _ => if self.irq_m0_enable { self.irq_stat = true; } //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
     }
   }
 
@@ -230,12 +235,12 @@ impl GPU {
     let mut color:[u8;8] = [0;8];
 
     let y = self.line as usize; //the line index
-    let bg_y = y + self.scroll_y as usize;
+    let bg_y = (y + self.scroll_y as usize) % 256;
     let bg_y_tile = bg_y / 8;  // there are 32x32 tiles that are 8x8 - find the tile index by divide through 8
     let bg_y_offset = bg_y % 8; //the offset of the line inside the sprite;
 
     for x in 0 .. SCREEN_WIDTH { //draw one pixel after the other
-      let bg_x = x + self.scroll_x as usize;
+      let bg_x = (x + self.scroll_x as usize) % 256;
       let bg_x_tile = bg_x / 8;
       let bg_x_offset = bg_x % 8;
 
@@ -249,23 +254,24 @@ impl GPU {
         current_tile = tile_selected_tile;
       }
 
-      self.screen_buffer[y][x] = (self.bg_palette >> color[bg_x_offset]* 2) & 0x03;
+      self.screen_buffer[y][x] = (self.bg_palette >> color[bg_x_offset] * 2) & 0x03;
+      self.color_buffer[y][x] = color[bg_x_offset];
     }
   }
 
   fn render_window(&mut self) {
-
+    println!("render window");
   }
 
   fn render_sprites(&mut self) {
-      for sprite_num in 0..40 {
+      for sprite_num in 0..40 {  //draw from the back to the front for sprite priority
         let sprite_address = (39 - sprite_num) * 4;
 
         let y = self.voam[sprite_address] as usize;
         let x = self.voam[sprite_address + 1] as usize;
 
         let line = self.line as usize + 16;
-        if y > 0 && y < 160 && x > 0 && x < 168 { //otherwise the sprite is hidden @TODO sprite ordering by x coordinate
+        if y > 0 && y < 160 && x > 0 && x < 168 { //otherwise the sprite is hidden
           if line >= y  && line < (y + self.sprite_size) {
             let sprite_id = self.voam[sprite_address + 2];
             let sprite_attributes = self.voam[sprite_address + 3];
@@ -273,6 +279,7 @@ impl GPU {
             let palette = if sprite_attributes & 0x10 == 0x10 { self.obj_palette_2 } else { self.obj_palette_1 };
             let flip_x = sprite_attributes & 0x20 == 0x20;
             let flip_y = sprite_attributes & 0x40 == 0x40;
+            let behind_bg = sprite_attributes & 0x80 == 0x80;
 
             /*  Bit7   OBJ-to-BG Priority (0=OBJ Above BG, 1=OBJ Behind BG color 1-3)
               (Used for both BG and Window. BG color 0 is always behind OBJ)
@@ -293,7 +300,7 @@ impl GPU {
               let pixel = if flip_x { 7 - x_offset } else { x_offset };
               if color[pixel] > 0 {
                 let screen_x = x + x_offset - 8;
-                if screen_x < 160 {
+                if screen_x < 160 && !(self.color_buffer[self.line as usize][screen_x] > 0 && behind_bg) {
                   self.screen_buffer[self.line as usize][screen_x] = (palette >> color[pixel] * 2) & 0x03;
                 }
               }

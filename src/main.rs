@@ -11,7 +11,7 @@ fn main() {
   let (video_sender, video_receiver) = mpsc::channel::<Vec<u8>>();
   let (input_sender, input_receiver) = mpsc::channel::<GBEvent>();
 
-  let cpu = Cpu::new("roms/nointro/Pac-Man (Europe).zip");
+  let cpu = Cpu::new("roms/sml.gb");
 
   let (mut input, mut display) = init_hardware(2 * SCREEN_WIDTH as u32, 2 * SCREEN_HEIGHT as u32, input_sender);
   let cpu_thread = thread::Builder::new().name("cpu".to_string()).spawn(move|| main_loop(cpu, input_receiver, video_sender)).unwrap();
