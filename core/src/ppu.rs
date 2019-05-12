@@ -4,13 +4,13 @@ use crate::SCREEN_HEIGHT;
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
 pub const VOAM_SIZE: usize = 0xA0;
 
-pub struct GPU {
-  pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
-  color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
-  pub screen_update: bool,
-
+pub struct Ppu {
   pub irq_vblank: bool,
   pub irq_stat: bool,
+
+  screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+  color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+  screen_update: bool,
 
   clock: usize,
   vram: [u8; VRAM_SIZE],
@@ -39,9 +39,9 @@ pub struct GPU {
   window_x: u8, //WX FF4B 7
 }
 
-impl GPU {
-  pub fn new() -> GPU {
-    GPU {
+impl Ppu {
+  pub fn new() -> Ppu {
+    Ppu {
       screen_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
       color_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
       screen_update: false,
@@ -147,6 +147,15 @@ impl GPU {
     self.screen_buffer.iter().flat_map(|array| array.iter()).cloned().collect()
   }
 
+  pub fn is_screen_updated(&mut self) -> bool {
+    if self.screen_update {
+      self.screen_update = false;
+      true
+    } else {
+      false
+    }
+  }
+
   /* timing
     OAM search - 80 - determine which sprites are visible
     pixel transfer - 172 - draw the stuff
@@ -250,7 +259,7 @@ impl GPU {
         let tile_address = if self.bg_window_tile_addressing { tile_offset as usize * 16 } else { 0x1000u16.wrapping_add((tile_offset as i8 as i16 * 16) as u16) as usize }; //false = 8800-97FF / true = 8000-8FFF
         let byte_address = tile_address + (bg_y_offset * 2);
 
-        color = GPU::sprite_row(self.vram[byte_address], self.vram[byte_address + 1]);
+        color = Ppu::sprite_row(self.vram[byte_address], self.vram[byte_address + 1]);
         current_tile = tile_selected_tile;
       }
 
@@ -294,7 +303,7 @@ impl GPU {
             let first = self.vram[sprite_start_address + sprite_line * 2];
             let second = self.vram[sprite_start_address + sprite_line * 2 + 1];
 
-            let color = GPU::sprite_row(first, second);
+            let color = Ppu::sprite_row(first, second);
             for x_offset in 0..8 {
               let pixel = if flip_x { 7 - x_offset } else { x_offset };
               if color[pixel] > 0 {
@@ -331,7 +340,7 @@ mod test
     let first =  0b01010101;
     let second = 0b11000011;
 
-    let result = GPU::sprite_row(first, second);
+    let result = Ppu::sprite_row(first, second);
 
     assert_eq!(result[0],  2);
     assert_eq!(result[1],  3);

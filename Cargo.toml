@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 core = { path = "core" }
 sdl2 = "0.32.1"
+sample = "0.10.0"

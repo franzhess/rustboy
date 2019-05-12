@@ -1,9 +1,11 @@
 use std::str;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
-use crate::gpu::VOAM_SIZE;
+use crate::ppu::VOAM_SIZE;
 use crate::mbc::{load_rom, Mbc};
-use crate::gpu::GPU;
+use crate::ppu::Ppu;
+use crate::apu::Apu;
+
 use crate::serial::Serial;
 
 const WRAM_SIZE: usize = 0x8000;
@@ -12,7 +14,8 @@ const HRAM_SIZE: usize = 0x7F;
 pub struct Mmu {
   wram: [u8; WRAM_SIZE],
   hram: [u8; HRAM_SIZE],
-  gpu: GPU,
+  ppu: Ppu,
+  apu: Apu,
   timer: Timer,
   pub joypad: Joypad,
   mbc: Box<Mbc+'static>,
@@ -30,7 +33,8 @@ impl Mmu {
     Mmu {
       wram: [0; WRAM_SIZE],
       hram: [0; HRAM_SIZE],
-      gpu: GPU::new(),
+      ppu: Ppu::new(),
+      apu: Apu::new(),
       timer: Timer::new(),
       joypad: Joypad::new(),
       mbc: rom,
@@ -44,11 +48,11 @@ impl Mmu {
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
       0x0000 ... 0x7FFF => self.mbc.read_rom(address), //ROM from cartridge
-      0x8000 ... 0x9FFF => self.gpu.read_byte(address), //VRAM
+      0x8000 ... 0x9FFF => self.ppu.read_byte(address), //VRAM
       0xA000 ... 0xBFFF => self.mbc.read_ram(address - 0xA000),
       0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000], //WRAM
       0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000], //WRAM Echo
-      0xFE00 ... 0xFE9F => self.gpu.read_byte(address), //OAM
+      0xFE00 ... 0xFE9F => self.ppu.read_byte(address), //OAM
       0xFEA0 ... 0xFEFF => 0, //not useable
       0xFF00 => self.joypad.read(), //Joypad
       0xFF01 ... 0xFF02 => self.serial.read(address), //serial
@@ -56,7 +60,7 @@ impl Mmu {
       0xFF0F => self.interrupt_request,
       0xFF10 ... 0xFF3F => 0, //sound
       0xFF46 => self.voam_oam,
-      0xFF40 ... 0xFF4B => self.gpu.read_byte(address),
+      0xFF40 ... 0xFF4B => self.ppu.read_byte(address),
       0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
       0xFFFF => self.interrupt_enable,
       _ => 0
@@ -70,11 +74,11 @@ impl Mmu {
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
       0x0000 ... 0x7FFF => self.mbc.write_rom(address, value), //ROM cartridge
-      0x8000 ... 0x9FFF => self.gpu.write_byte(address, value), //VRAM
+      0x8000 ... 0x9FFF => self.ppu.write_byte(address, value), //VRAM
       0xA000 ... 0xBFFF => self.mbc.write_ram(address - 0xA000, value),
       0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000] = value, //WRAM
       0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000] = value, //WRAM Echo
-      0xFE00 ... 0xFE9F => self.gpu.write_byte(address, value), //OAM
+      0xFE00 ... 0xFE9F => self.ppu.write_byte(address, value), //OAM
       0xFEA0 ... 0xFEFF => (), //not useable
       0xFF00 => self.joypad.write(value), //JOYPAD
       0xFF01 ... 0xFF02 => self.serial.write(address, value), //serial
@@ -82,7 +86,7 @@ impl Mmu {
       0xFF0F => self.interrupt_request = value,
       0xFF10 ... 0xFF3F => (), //sound
       0xFF46 => { self.voam_oam = value; self.copy_to_voam(value) },
-      0xFF40 ... 0xFF4B => self.gpu.write_byte(address, value),
+      0xFF40 ... 0xFF4B => self.ppu.write_byte(address, value),
       0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
       _ => {}
@@ -95,37 +99,41 @@ impl Mmu {
   }
 
   pub fn get_screen_buffer(&self) -> Vec<u8> {
-    self.gpu.get_screen_buffer()
+    self.ppu.get_screen_buffer()
   }
 
-  pub fn get_screen_updated(&mut self) -> bool {
-    let b = self.gpu.screen_update;
-    if self.gpu.screen_update {
-      self.gpu.screen_update = false;
-    }
-    b
+  pub fn get_sound_buffer(&mut self) -> Vec<i16> {
+    self.apu.get_sound_buffer()
   }
+
+  pub fn get_screen_updated(&mut self) -> bool { self.ppu.is_screen_updated() }
+
+  pub fn get_audio_updated(&mut self) -> bool { self.apu.is_audio_updated() }
+
 
   pub fn do_ticks(&mut self, ticks: usize) {
     self.timer.do_ticks(ticks);
-    self.gpu.do_ticks(ticks);
+    self.ppu.do_ticks(ticks);
+    self.apu.do_ticks(ticks);
   }
 
   pub fn process_irq_requests(&mut self) {
-    if self.gpu.irq_vblank {
+    if self.ppu.irq_vblank {
       self.interrupt_request |= 0x01;
-      self.gpu.irq_vblank = false;
+      self.ppu.irq_vblank = false;
     }
 
-    if self.gpu.irq_stat {
+    if self.ppu.irq_stat {
       self.interrupt_request |= 0x02;
-      self.gpu.irq_stat = false;
+      self.ppu.irq_stat = false;
     }
 
     if self.timer.irq_timer {
       self.interrupt_request |= 0x04;
       self.timer.irq_timer = false;
     }
+
+    //@TODO add joypad and serial interrupts
   }
 
   fn copy_to_voam(&mut self, value: u8) {

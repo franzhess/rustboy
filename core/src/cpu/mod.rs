@@ -83,13 +83,16 @@ impl Cpu {
     self.mmu.joypad.receive_event(event);
   }
 
+  pub fn is_screen_updated(&mut self) -> bool {
+    self.mmu.get_screen_updated()
+  }
   pub fn get_screen_buffer(&self) -> Vec<u8> {
     self.mmu.get_screen_buffer()
   }
 
-  pub fn get_screen_updated(&mut self) -> bool {
-    self.mmu.get_screen_updated()
-  }
+  pub fn is_audio_updated(&mut self) -> bool { self.mmu.get_audio_updated() }
+  pub fn get_sound_buffer(&mut self) -> Vec<i16> { self.mmu.get_sound_buffer() }
+
 
   fn do_cycle(&mut self) -> usize {
     let current_address = self.registers.pc;
