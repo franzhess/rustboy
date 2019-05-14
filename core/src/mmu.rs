@@ -1,4 +1,3 @@
-use std::str;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
 use crate::ppu::VOAM_SIZE;

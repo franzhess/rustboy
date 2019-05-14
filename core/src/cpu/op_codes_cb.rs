@@ -4,6 +4,7 @@ use crate::cpu::OpCodeResult::Executed;
 use crate::cpu::Cpu;
 use crate::cpu::registers::RegisterName8;
 
+#[allow(unreachable_patterns)]
 pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
   match op_code {
     0x00 => { cpu.execute(alu::rlc, RegisterName8::B); Executed(8) }, //RLC B
@@ -262,6 +263,6 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0xFD => { cpu.registers.l = cpu.registers.l | (1 << 7); Executed(8) }, //SET 7,L
     0xFE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 7); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 7,(HL)
     0xFF => { cpu.registers.a = cpu.registers.a | (1 << 7); Executed(8) }, //SET 7,A
-    _ => { cpu.halted = true; Executed(4) }
+    _ => { cpu.halted = true; Executed(4) } //unreachable, but linux compiler will complain
   }
 }

@@ -16,12 +16,10 @@ pub const SCREEN_HEIGHT: usize = 144;
 pub const AUDIO_OUTPUT_FREQUENCY: usize = 48_000;
 pub const AUDIO_BUFFER_SIZE: usize = 800;
 
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::Receiver;
 use std::time::{Instant, Duration};
 
 use crate::cpu::Cpu;
-use std::thread::sleep;
-use std::mem::size_of;
 
 #[derive(Debug)]
 pub enum GBEvent {

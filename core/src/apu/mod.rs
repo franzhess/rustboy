@@ -3,19 +3,16 @@ mod noise;
 mod wave;
 
 use crate::CPU_FREQUENCY;
-use blip_buf::BlipBuf;
 use crate::AUDIO_OUTPUT_FREQUENCY;
 use std::f64;
 use sample::signal::Signal;
 use sample::signal::ConstHz;
-use sample::signal::Sine;
 use sample::signal::Square;
 use std::sync::mpsc::Sender;
 use std::thread::park;
 use crate::AUDIO_BUFFER_SIZE;
 
 const FRAME_TICKS: usize = ((AUDIO_BUFFER_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
-const SAMPLE_RATE: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
 
 pub struct Apu {
   audio_sender: Sender<Vec<i16>>,
@@ -25,7 +22,7 @@ pub struct Apu {
 
 impl Apu {
   pub fn new(audio_sender: Sender<Vec<i16>>) -> Apu {
-    let mut signal = sample::signal::rate(AUDIO_OUTPUT_FREQUENCY as f64).const_hz(800 as f64).square();
+    let signal = sample::signal::rate(AUDIO_OUTPUT_FREQUENCY as f64).const_hz(800 as f64).square();
 
     Apu {
       audio_sender,
@@ -45,10 +42,11 @@ impl Apu {
 
   fn generate_frame(&mut self) {
     let mut buffer = vec![];
-    for x in 0 .. AUDIO_BUFFER_SIZE {
-      buffer.push((1000f64 * self.signal.next()[0]) as i16);
+    for _x in 0 .. AUDIO_BUFFER_SIZE {
+      let amp = (1_000f64 * self.signal.next()[0]) as i16;
+      buffer.push(amp); //mono
     }
-    self.audio_sender.send(buffer);
+    self.audio_sender.send(buffer).expect("Failed to send audio data!");
     park();
   }
 }

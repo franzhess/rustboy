@@ -24,13 +24,10 @@ impl AudioCallback for SoundBuffer {
   type Channel = i16;
 
   fn callback(&mut self, out: &mut [i16]) {
-    println!("requested: {} - available: {}", out.len(), self.queue.len());
     for x in out.iter_mut() {
       *x = match self.queue.pop_front() {
         Some(x) => x,
-        None => {
-          //println!("Audio buffer underflow!");
-          0 }
+        None => { println!("Audio buffer underflow!"); 0 }
       };
     }
   }
@@ -50,7 +47,7 @@ impl Sound {
       samples: Some(AUDIO_BUFFER_SIZE as u16),
     };
 
-    let device = audio_subsystem.open_playback(None, &desired_spec, | spec |{
+    let device = audio_subsystem.open_playback(None, &desired_spec, | _spec | {
       SoundBuffer::new()
     }).unwrap();
 
