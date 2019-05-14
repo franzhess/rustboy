@@ -49,6 +49,7 @@ impl Apu {
       buffer.push((1000f64 * self.signal.next()[0]) as i16);
     }
     self.audio_sender.send(buffer);
+    park();
   }
 }
 

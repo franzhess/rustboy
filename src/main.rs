@@ -39,10 +39,15 @@ fn main() {
       Err(TryRecvError::Empty) => ()
     }
 
+    if sound.queue_size() <= 10 {
+      cpu_thread.thread().unpark();
+    }
+
     sleep(Duration::from_millis(5));
   }
 
   sound.stop();
 
+  cpu_thread.thread().unpark(); // unpark if you have exited while the cpu was sleeping
   cpu_thread.join().expect("failed to end cpu thread!");
 }

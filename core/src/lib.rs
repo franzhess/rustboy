@@ -54,10 +54,9 @@ pub struct GBKeyEvent {
 }
 
 pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>) {
-  let mut last_frame = Instant::now();
-  let one_frame = Duration::from_micros(16666); //60Hz
-  let mut ticks_per_frame : usize = 0;
-  let target_ticks_per_frame =  CPU_FREQUENCY / 60 as usize;
+  let mut last_second = Instant::now();
+  let one_second = Duration::from_secs(1);
+  let mut ticks_per_second : usize = 0;
 
   'running: loop {
     for event in input_receiver.try_iter() {
@@ -67,18 +66,14 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>) {
       }
     }
 
-    ticks_per_frame += cpu.tick();
+    ticks_per_second += cpu.tick();
 
-    if last_frame.elapsed() < one_frame {
-      if ticks_per_frame >= target_ticks_per_frame {
-        sleep(one_frame - last_frame.elapsed());
-        ticks_per_frame = 0;
-        last_frame = Instant::now();
+    if last_second.elapsed() >= one_second {
+      if ticks_per_second < CPU_FREQUENCY {
+        println!("CPU slow! {} ticks should be {}", ticks_per_second, CPU_FREQUENCY);
       }
-    } else {
-      println!("CPU slow! {} ticks should be {}", ticks_per_frame, target_ticks_per_frame);
-      ticks_per_frame = 0;
-      last_frame = Instant::now();
+      ticks_per_second = 0;
+      last_second = Instant::now();
     }
   }
 }
