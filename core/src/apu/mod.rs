@@ -11,6 +11,7 @@ use sample::signal::ConstHz;
 use sample::signal::Sine;
 use sample::signal::Square;
 use std::sync::mpsc::Sender;
+use std::thread::park;
 
 const FRAME_SIZE: usize = AUDIO_OUTPUT_FREQUENCY / 60;
 const FRAME_TICKS: usize = ((FRAME_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;

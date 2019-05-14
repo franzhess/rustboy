@@ -2,12 +2,12 @@ use std::str;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
 use crate::ppu::VOAM_SIZE;
-use crate::mbc::{load_rom, Mbc};
 use crate::ppu::Ppu;
 use crate::apu::Apu;
 
 use crate::serial::Serial;
 use std::sync::mpsc::Sender;
+use crate::mbc::Mbc;
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
@@ -27,14 +27,11 @@ pub struct Mmu {
 }
 
 impl Mmu {
-  pub fn new(file_name: &str, audio_sender: Sender<Vec<i16>>) -> Mmu {
-    let rom = load_rom(file_name);
-    println!("Successfully loaded: {}", rom.name());
-
+  pub fn new(rom: Box<Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Mmu {
     Mmu {
       wram: [0; WRAM_SIZE],
       hram: [0; HRAM_SIZE],
-      ppu: Ppu::new(),
+      ppu: Ppu::new(video_sender),
       apu: Apu::new(audio_sender),
       timer: Timer::new(),
       joypad: Joypad::new(),
@@ -98,12 +95,6 @@ impl Mmu {
     self.write_byte(address, (value & 0x00FF) as u8); //LSB first
     self.write_byte(address + 1, ((value & 0xFF00) >> 8) as u8);
   }
-
-  pub fn get_screen_buffer(&self) -> Vec<u8> {
-    self.ppu.get_screen_buffer()
-  }
-
-  pub fn get_screen_updated(&mut self) -> bool { self.ppu.is_screen_updated() }
 
   pub fn do_ticks(&mut self, ticks: usize) {
     self.timer.do_ticks(ticks);

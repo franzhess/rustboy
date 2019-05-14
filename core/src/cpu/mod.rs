@@ -7,6 +7,7 @@ use crate::mmu::Mmu;
 use crate::GBKeyEvent;
 use crate::cpu::registers::{Registers, RegisterName8, RegisterName16, FlagRegister};
 use std::sync::mpsc::Sender;
+use crate::mbc::Mbc;
 
 pub enum OpCodeResult {
   Executed(usize),
@@ -26,10 +27,10 @@ pub struct Cpu {
 }
 
 impl Cpu {
-  pub fn new(file_name: &str, audio_sender: Sender<Vec<i16>>) -> Cpu {
+  pub fn new(rom: Box<Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Cpu {
     Cpu {
       registers: Registers::new(),
-      mmu: Mmu::new(file_name, audio_sender),
+      mmu: Mmu::new(rom, video_sender, audio_sender),
       halted: false,
       ime: false, //interrupt master enable
       ei_requested: 0, //enable interrupt requested - in the original gameboy the enabling of the interrupts took two cycles (see tick)
@@ -82,13 +83,6 @@ impl Cpu {
 
   pub fn process_input_event(&mut self, event: GBKeyEvent) {
     self.mmu.joypad.receive_event(event);
-  }
-
-  pub fn is_screen_updated(&mut self) -> bool {
-    self.mmu.get_screen_updated()
-  }
-  pub fn get_screen_buffer(&self) -> Vec<u8> {
-    self.mmu.get_screen_buffer()
   }
 
   fn do_cycle(&mut self) -> usize {

@@ -1,6 +1,6 @@
 pub mod cpu;
+pub mod mbc;
 
-mod mbc;
 mod mmu;
 mod joypad;
 mod timer;
@@ -53,7 +53,7 @@ pub struct GBKeyEvent {
   pub state: GBKeyState
 }
 
-pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
+pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>) {
   let mut last_frame = Instant::now();
   let one_frame = Duration::from_micros(16666); //60Hz
   let mut ticks_per_frame : usize = 0;
@@ -68,10 +68,6 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender:
     }
 
     ticks_per_frame += cpu.tick();
-
-    if cpu.is_screen_updated() {
-      screen_sender.send(cpu.get_screen_buffer()).expect("failed to send video data!");
-    }
 
     if last_frame.elapsed() < one_frame {
       if ticks_per_frame >= target_ticks_per_frame {

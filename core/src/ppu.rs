@@ -1,5 +1,6 @@
 use crate::SCREEN_WIDTH;
 use crate::SCREEN_HEIGHT;
+use std::sync::mpsc::Sender;
 
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
 pub const VOAM_SIZE: usize = 0xA0;
@@ -10,7 +11,7 @@ pub struct Ppu {
 
   screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
   color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
-  screen_update: bool,
+  video_sender: Sender<Vec<u8>>,
 
   clock: usize,
   vram: [u8; VRAM_SIZE],
@@ -40,11 +41,11 @@ pub struct Ppu {
 }
 
 impl Ppu {
-  pub fn new() -> Ppu {
+  pub fn new(video_sender: Sender<Vec<u8>>) -> Ppu {
     Ppu {
       screen_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
       color_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
-      screen_update: false,
+      video_sender,
       irq_vblank: false,
       irq_stat: false,
       clock: 0, // for the first line
@@ -147,13 +148,8 @@ impl Ppu {
     self.screen_buffer.iter().flat_map(|array| array.iter()).cloned().collect()
   }
 
-  pub fn is_screen_updated(&mut self) -> bool {
-    if self.screen_update {
-      self.screen_update = false;
-      true
-    } else {
-      false
-    }
+  pub fn send_to_screen(&mut self) {
+    self.video_sender.send(self.get_screen_buffer()).expect("Failed to send screen buffer!");
   }
 
   /* timing
@@ -218,7 +214,7 @@ impl Ppu {
     self.mode = mode;
 
     match mode {
-      1 => { if self.irq_m1_enable { self.irq_stat = true; }; self.irq_vblank = true; self.screen_update = true }, //we finished the screen, tell the window to refresh
+      1 => { if self.irq_m1_enable { self.irq_stat = true; }; self.irq_vblank = true; self.send_to_screen(); }, //we finished the screen, tell the window to refresh
       2 => if self.irq_m2_enable { self.irq_stat = true; }, //determine visible sprites
       3 => self.render_line(), //draw the current line
       _ => if self.irq_m0_enable { self.irq_stat = true; } //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
