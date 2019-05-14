@@ -1,7 +1,7 @@
 use sdl2::audio::*;
 use sdl2::Sdl;
 use core::AUDIO_OUTPUT_FREQUENCY;
-use core::AUDIO_SAMPLE_SIZE;
+use core::AUDIO_BUFFER_SIZE;
 use std::collections::vec_deque::VecDeque;
 
 struct SoundBuffer {
@@ -24,10 +24,13 @@ impl AudioCallback for SoundBuffer {
   type Channel = i16;
 
   fn callback(&mut self, out: &mut [i16]) {
+    println!("requested: {} - available: {}", out.len(), self.queue.len());
     for x in out.iter_mut() {
       *x = match self.queue.pop_front() {
         Some(x) => x,
-        None => { println!("Audio buffer underflow!"); 0 }
+        None => {
+          //println!("Audio buffer underflow!");
+          0 }
       };
     }
   }
@@ -44,7 +47,7 @@ impl Sound {
     let desired_spec = AudioSpecDesired {
       freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
       channels: Some(1), // stereo
-      samples: Some(AUDIO_SAMPLE_SIZE as u16),
+      samples: Some(AUDIO_BUFFER_SIZE as u16),
     };
 
     let device = audio_subsystem.open_playback(None, &desired_spec, | spec |{

@@ -13,8 +13,8 @@ pub const CPU_FREQUENCY: usize = 4_194_304; //4.194304 MHz
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
-pub const AUDIO_OUTPUT_FREQUENCY: usize = 44_100;
-pub const AUDIO_SAMPLE_SIZE: usize = size_of::<i16>() * 2;
+pub const AUDIO_OUTPUT_FREQUENCY: usize = 48_000;
+pub const AUDIO_BUFFER_SIZE: usize = 800;
 
 use std::sync::mpsc::{Sender, Receiver};
 use std::time::{Instant, Duration};

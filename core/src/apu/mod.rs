@@ -12,9 +12,9 @@ use sample::signal::Sine;
 use sample::signal::Square;
 use std::sync::mpsc::Sender;
 use std::thread::park;
+use crate::AUDIO_BUFFER_SIZE;
 
-const FRAME_SIZE: usize = AUDIO_OUTPUT_FREQUENCY / 60;
-const FRAME_TICKS: usize = ((FRAME_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
+const FRAME_TICKS: usize = ((AUDIO_BUFFER_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
 const SAMPLE_RATE: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
 
 pub struct Apu {
@@ -45,7 +45,7 @@ impl Apu {
 
   fn generate_frame(&mut self) {
     let mut buffer = vec![];
-    for x in 0 .. FRAME_SIZE {
+    for x in 0 .. AUDIO_BUFFER_SIZE {
       buffer.push((1000f64 * self.signal.next()[0]) as i16);
     }
     self.audio_sender.send(buffer);
