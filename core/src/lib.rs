@@ -53,7 +53,7 @@ pub struct GBKeyEvent {
   pub state: GBKeyState
 }
 
-pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) {
+pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender: Sender<Vec<u8>>) {
   let mut last_frame = Instant::now();
   let one_frame = Duration::from_micros(16666); //60Hz
   let mut ticks_per_frame : usize = 0;
@@ -71,10 +71,6 @@ pub fn main_loop(mut cpu: Cpu, input_receiver: Receiver<GBEvent>, screen_sender:
 
     if cpu.is_screen_updated() {
       screen_sender.send(cpu.get_screen_buffer()).expect("failed to send video data!");
-    }
-
-    if cpu.is_audio_updated() {
-      audio_sender.send(cpu.get_sound_buffer()).expect("failed to send audio data!");
     }
 
     if last_frame.elapsed() < one_frame {

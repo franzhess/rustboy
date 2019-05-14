@@ -7,6 +7,7 @@ use crate::ppu::Ppu;
 use crate::apu::Apu;
 
 use crate::serial::Serial;
+use std::sync::mpsc::Sender;
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
@@ -26,7 +27,7 @@ pub struct Mmu {
 }
 
 impl Mmu {
-  pub fn new(file_name: &str) -> Mmu {
+  pub fn new(file_name: &str, audio_sender: Sender<Vec<i16>>) -> Mmu {
     let rom = load_rom(file_name);
     println!("Successfully loaded: {}", rom.name());
 
@@ -34,7 +35,7 @@ impl Mmu {
       wram: [0; WRAM_SIZE],
       hram: [0; HRAM_SIZE],
       ppu: Ppu::new(),
-      apu: Apu::new(),
+      apu: Apu::new(audio_sender),
       timer: Timer::new(),
       joypad: Joypad::new(),
       mbc: rom,
@@ -102,14 +103,7 @@ impl Mmu {
     self.ppu.get_screen_buffer()
   }
 
-  pub fn get_sound_buffer(&mut self) -> Vec<i16> {
-    self.apu.get_sound_buffer()
-  }
-
   pub fn get_screen_updated(&mut self) -> bool { self.ppu.is_screen_updated() }
-
-  pub fn get_audio_updated(&mut self) -> bool { self.apu.is_audio_updated() }
-
 
   pub fn do_ticks(&mut self, ticks: usize) {
     self.timer.do_ticks(ticks);

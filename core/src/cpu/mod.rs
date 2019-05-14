@@ -6,6 +6,7 @@ mod op_codes_cb;
 use crate::mmu::Mmu;
 use crate::GBKeyEvent;
 use crate::cpu::registers::{Registers, RegisterName8, RegisterName16, FlagRegister};
+use std::sync::mpsc::Sender;
 
 pub enum OpCodeResult {
   Executed(usize),
@@ -25,10 +26,10 @@ pub struct Cpu {
 }
 
 impl Cpu {
-  pub fn new(file_name: &str) -> Cpu {
+  pub fn new(file_name: &str, audio_sender: Sender<Vec<i16>>) -> Cpu {
     Cpu {
       registers: Registers::new(),
-      mmu: Mmu::new(file_name),
+      mmu: Mmu::new(file_name, audio_sender),
       halted: false,
       ime: false, //interrupt master enable
       ei_requested: 0, //enable interrupt requested - in the original gameboy the enabling of the interrupts took two cycles (see tick)
@@ -89,10 +90,6 @@ impl Cpu {
   pub fn get_screen_buffer(&self) -> Vec<u8> {
     self.mmu.get_screen_buffer()
   }
-
-  pub fn is_audio_updated(&mut self) -> bool { self.mmu.get_audio_updated() }
-  pub fn get_sound_buffer(&mut self) -> Vec<i16> { self.mmu.get_sound_buffer() }
-
 
   fn do_cycle(&mut self) -> usize {
     let current_address = self.registers.pc;

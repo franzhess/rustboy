@@ -10,29 +10,26 @@ use sample::signal::Signal;
 use sample::signal::ConstHz;
 use sample::signal::Sine;
 use sample::signal::Square;
+use std::sync::mpsc::Sender;
 
 const FRAME_SIZE: usize = AUDIO_OUTPUT_FREQUENCY / 60;
 const FRAME_TICKS: usize = ((FRAME_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
 const SAMPLE_RATE: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
 
 pub struct Apu {
+  audio_sender: Sender<Vec<i16>>,
   signal: Square<ConstHz>,
-  audio_updated: bool,
-  last_amp: i32,
   counter: usize,
-  buffer: [i16; FRAME_SIZE]
 }
 
 impl Apu {
-  pub fn new() -> Apu {
+  pub fn new(audio_sender: Sender<Vec<i16>>) -> Apu {
     let mut signal = sample::signal::rate(AUDIO_OUTPUT_FREQUENCY as f64).const_hz(800 as f64).square();
 
     Apu {
+      audio_sender,
       signal,
-      audio_updated: false,
-      last_amp: 0,
       counter: 0,
-      buffer: [0; FRAME_SIZE]
     }
   }
 
@@ -42,27 +39,15 @@ impl Apu {
     while self.counter >= FRAME_TICKS {
       self.generate_frame();
       self.counter -= FRAME_TICKS;
-      self.audio_updated = true;
     }
   }
 
   fn generate_frame(&mut self) {
+    let mut buffer = vec![];
     for x in 0 .. FRAME_SIZE {
-      self.buffer[x] = (1000f64 * self.signal.next()[0]) as i16;
+      buffer.push((1000f64 * self.signal.next()[0]) as i16);
     }
-  }
-
-  pub fn is_audio_updated(&mut self) -> bool {
-    if self.audio_updated {
-      self.audio_updated = false;
-      true
-    } else {
-      false
-    }
-  }
-
-  pub fn get_sound_buffer(&mut self) -> Vec<i16> {
-    self.buffer.to_vec()
+    self.audio_sender.send(buffer);
   }
 }
 
