@@ -1,5 +1,4 @@
 mod sdl;
-mod emulation;
 
 use sdl::init_hardware;
 use std::sync::mpsc;
@@ -8,7 +7,7 @@ use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
-use emulation::*;
+use core::*;
 use core::cpu::Cpu;
 use core::mbc::load_rom;
 
