@@ -22,10 +22,9 @@ impl Mbc for Mbc0 {
   }
 
   fn write_rom(&mut self, _address: u16, _value: u8) {
-    ()
   }
 
   fn write_ram(&mut self, _address: u16, _value: u8) {
-    ()
+
   }
 }

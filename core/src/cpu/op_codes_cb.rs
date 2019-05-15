@@ -135,134 +135,134 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
     0x7D => { let value = cpu.registers.l; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,L
     0x7E => { let value = cpu.mmu.read_byte(cpu.registers.get_hl()); alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,(HL)
     0x7F => { let value = cpu.registers.a; alu::bit(&mut cpu.registers, 7, value); Executed(8) }, //BIT 7,A
-    0x80 => { cpu.registers.b = cpu.registers.b & !(1 << 0); Executed(8) }, //RES 0,B
-    0x81 => { cpu.registers.c = cpu.registers.c & !(1 << 0); Executed(8) }, //RES 0,C
-    0x82 => { cpu.registers.d = cpu.registers.d & !(1 << 0); Executed(8) }, //RES 0,D
-    0x83 => { cpu.registers.e = cpu.registers.e & !(1 << 0); Executed(8) }, //RES 0,E
-    0x84 => { cpu.registers.h = cpu.registers.h & !(1 << 0); Executed(8) }, //RES 0,H
-    0x85 => { cpu.registers.l = cpu.registers.l & !(1 << 0); Executed(8) }, //RES 0,L
-    0x86 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 0); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 0,(HL)
-    0x87 => { cpu.registers.a = cpu.registers.a & !(1 << 0); Executed(8) }, //RES 0,A
-    0x88 => { cpu.registers.b = cpu.registers.b & !(1 << 1); Executed(8) }, //RES 1,B
-    0x89 => { cpu.registers.c = cpu.registers.c & !(1 << 1); Executed(8) }, //RES 1,C
-    0x8A => { cpu.registers.d = cpu.registers.d & !(1 << 1); Executed(8) }, //RES 1,D
-    0x8B => { cpu.registers.e = cpu.registers.e & !(1 << 1); Executed(8) }, //RES 1,E
-    0x8C => { cpu.registers.h = cpu.registers.h & !(1 << 1); Executed(8) }, //RES 1,H
-    0x8D => { cpu.registers.l = cpu.registers.l & !(1 << 1); Executed(8) }, //RES 1,L
-    0x8E => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 1); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 1,(HL)
-    0x8F => { cpu.registers.a = cpu.registers.a & !(1 << 1); Executed(8) }, //RES 1,A
-    0x90 => { cpu.registers.b = cpu.registers.b & !(1 << 2); Executed(8) }, //RES 2,B
-    0x91 => { cpu.registers.c = cpu.registers.c & !(1 << 2); Executed(8) }, //RES 2,C
-    0x92 => { cpu.registers.d = cpu.registers.d & !(1 << 2); Executed(8) }, //RES 2,D
-    0x93 => { cpu.registers.e = cpu.registers.e & !(1 << 2); Executed(8) }, //RES 2,E
-    0x94 => { cpu.registers.h = cpu.registers.h & !(1 << 2); Executed(8) }, //RES 2,H
-    0x95 => { cpu.registers.l = cpu.registers.l & !(1 << 2); Executed(8) }, //RES 2,L
-    0x96 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 2); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 2,(HL)
-    0x97 => { cpu.registers.a = cpu.registers.a & !(1 << 2); Executed(8) }, //RES 2,A
-    0x98 => { cpu.registers.b = cpu.registers.b & !(1 << 3); Executed(8) }, //RES 3,B
-    0x99 => { cpu.registers.c = cpu.registers.c & !(1 << 3); Executed(8) }, //RES 3,C
-    0x9A => { cpu.registers.d = cpu.registers.d & !(1 << 3); Executed(8) }, //RES 3,D
-    0x9B => { cpu.registers.e = cpu.registers.e & !(1 << 3); Executed(8) }, //RES 3,E
-    0x9C => { cpu.registers.h = cpu.registers.h & !(1 << 3); Executed(8) }, //RES 3,H
-    0x9D => { cpu.registers.l = cpu.registers.l & !(1 << 3); Executed(8) }, //RES 3,L
-    0x9E => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 3); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 3,(HL)
-    0x9F => { cpu.registers.a = cpu.registers.a & !(1 << 3); Executed(8) }, //RES 3,A
-    0xA0 => { cpu.registers.b = cpu.registers.b & !(1 << 4); Executed(8) }, //RES 4,B
-    0xA1 => { cpu.registers.c = cpu.registers.c & !(1 << 4); Executed(8) }, //RES 4,C
-    0xA2 => { cpu.registers.d = cpu.registers.d & !(1 << 4); Executed(8) }, //RES 4,D
-    0xA3 => { cpu.registers.e = cpu.registers.e & !(1 << 4); Executed(8) }, //RES 4,E
-    0xA4 => { cpu.registers.h = cpu.registers.h & !(1 << 4); Executed(8) }, //RES 4,H
-    0xA5 => { cpu.registers.l = cpu.registers.l & !(1 << 4); Executed(8) }, //RES 4,L
-    0xA6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 4); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 4,(HL)
-    0xA7 => { cpu.registers.a = cpu.registers.a & !(1 << 4); Executed(8) }, //RES 4,A
-    0xA8 => { cpu.registers.b = cpu.registers.b & !(1 << 5); Executed(8) }, //RES 5,B
-    0xA9 => { cpu.registers.c = cpu.registers.c & !(1 << 5); Executed(8) }, //RES 5,C
-    0xAA => { cpu.registers.d = cpu.registers.d & !(1 << 5); Executed(8) }, //RES 5,D
-    0xAB => { cpu.registers.e = cpu.registers.e & !(1 << 5); Executed(8) }, //RES 5,E
-    0xAC => { cpu.registers.h = cpu.registers.h & !(1 << 5); Executed(8) }, //RES 5,H
-    0xAD => { cpu.registers.l = cpu.registers.l & !(1 << 5); Executed(8) }, //RES 5,L
-    0xAE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 5); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 5,(HL)
-    0xAF => { cpu.registers.a = cpu.registers.a & !(1 << 5); Executed(8) }, //RES 5,A
-    0xB0 => { cpu.registers.b = cpu.registers.b & !(1 << 6); Executed(8) }, //RES 6,B
-    0xB1 => { cpu.registers.c = cpu.registers.c & !(1 << 6); Executed(8) }, //RES 6,C
-    0xB2 => { cpu.registers.d = cpu.registers.d & !(1 << 6); Executed(8) }, //RES 6,D
-    0xB3 => { cpu.registers.e = cpu.registers.e & !(1 << 6); Executed(8) }, //RES 6,E
-    0xB4 => { cpu.registers.h = cpu.registers.h & !(1 << 6); Executed(8) }, //RES 6,H
-    0xB5 => { cpu.registers.l = cpu.registers.l & !(1 << 6); Executed(8) }, //RES 6,L
-    0xB6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 6); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 6,(HL)
-    0xB7 => { cpu.registers.a = cpu.registers.a & !(1 << 6); Executed(8) }, //RES 6,A
-    0xB8 => { cpu.registers.b = cpu.registers.b & !(1 << 7); Executed(8) }, //RES 7,B
-    0xB9 => { cpu.registers.c = cpu.registers.c & !(1 << 7); Executed(8) }, //RES 7,C
-    0xBA => { cpu.registers.d = cpu.registers.d & !(1 << 7); Executed(8) }, //RES 7,D
-    0xBB => { cpu.registers.e = cpu.registers.e & !(1 << 7); Executed(8) }, //RES 7,E
-    0xBC => { cpu.registers.h = cpu.registers.h & !(1 << 7); Executed(8) }, //RES 7,H
-    0xBD => { cpu.registers.l = cpu.registers.l & !(1 << 7); Executed(8) }, //RES 7,L
-    0xBE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !(1 << 7); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 7,(HL)
-    0xBF => { cpu.registers.a = cpu.registers.a & !(1 << 7); Executed(8) }, //RES 7,A
-    0xC0 => { cpu.registers.b = cpu.registers.b | (1 << 0); Executed(8) }, //SET 0,B
-    0xC1 => { cpu.registers.c = cpu.registers.c | (1 << 0); Executed(8) }, //SET 0,C
-    0xC2 => { cpu.registers.d = cpu.registers.d | (1 << 0); Executed(8) }, //SET 0,D
-    0xC3 => { cpu.registers.e = cpu.registers.e | (1 << 0); Executed(8) }, //SET 0,E
-    0xC4 => { cpu.registers.h = cpu.registers.h | (1 << 0); Executed(8) }, //SET 0,H
-    0xC5 => { cpu.registers.l = cpu.registers.l | (1 << 0); Executed(8) }, //SET 0,L
-    0xC6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 0); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 0,(HL)
-    0xC7 => { cpu.registers.a = cpu.registers.a | (1 << 0); Executed(8) }, //SET 0,A
-    0xC8 => { cpu.registers.b = cpu.registers.b | (1 << 1); Executed(8) }, //SET 1,B
-    0xC9 => { cpu.registers.c = cpu.registers.c | (1 << 1); Executed(8) }, //SET 1,C
-    0xCA => { cpu.registers.d = cpu.registers.d | (1 << 1); Executed(8) }, //SET 1,D
-    0xCB => { cpu.registers.e = cpu.registers.e | (1 << 1); Executed(8) }, //SET 1,E
-    0xCC => { cpu.registers.h = cpu.registers.h | (1 << 1); Executed(8) }, //SET 1,H
-    0xCD => { cpu.registers.l = cpu.registers.l | (1 << 1); Executed(8) }, //SET 1,L
-    0xCE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 1); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 1,(HL)
-    0xCF => { cpu.registers.a = cpu.registers.a | (1 << 1); Executed(8) }, //SET 1,A
-    0xD0 => { cpu.registers.b = cpu.registers.b | (1 << 2); Executed(8) }, //SET 2,B
-    0xD1 => { cpu.registers.c = cpu.registers.c | (1 << 2); Executed(8) }, //SET 2,C
-    0xD2 => { cpu.registers.d = cpu.registers.d | (1 << 2); Executed(8) }, //SET 2,D
-    0xD3 => { cpu.registers.e = cpu.registers.e | (1 << 2); Executed(8) }, //SET 2,E
-    0xD4 => { cpu.registers.h = cpu.registers.h | (1 << 2); Executed(8) }, //SET 2,H
-    0xD5 => { cpu.registers.l = cpu.registers.l | (1 << 2); Executed(8) }, //SET 2,L
-    0xD6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 2); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 2,(HL)
-    0xD7 => { cpu.registers.a = cpu.registers.a | (1 << 2); Executed(8) }, //SET 2,A
-    0xD8 => { cpu.registers.b = cpu.registers.b | (1 << 3); Executed(8) }, //SET 3,B
-    0xD9 => { cpu.registers.c = cpu.registers.c | (1 << 3); Executed(8) }, //SET 3,C
-    0xDA => { cpu.registers.d = cpu.registers.d | (1 << 3); Executed(8) }, //SET 3,D
-    0xDB => { cpu.registers.e = cpu.registers.e | (1 << 3); Executed(8) }, //SET 3,E
-    0xDC => { cpu.registers.h = cpu.registers.h | (1 << 3); Executed(8) }, //SET 3,H
-    0xDD => { cpu.registers.l = cpu.registers.l | (1 << 3); Executed(8) }, //SET 3,L
-    0xDE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 3); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 3,(HL)
-    0xDF => { cpu.registers.a = cpu.registers.a | (1 << 3); Executed(8) }, //SET 3,A
-    0xE0 => { cpu.registers.b = cpu.registers.b | (1 << 4); Executed(8) }, //SET 4,B
-    0xE1 => { cpu.registers.c = cpu.registers.c | (1 << 4); Executed(8) }, //SET 4,C
-    0xE2 => { cpu.registers.d = cpu.registers.d | (1 << 4); Executed(8) }, //SET 4,D
-    0xE3 => { cpu.registers.e = cpu.registers.e | (1 << 4); Executed(8) }, //SET 4,E
-    0xE4 => { cpu.registers.h = cpu.registers.h | (1 << 4); Executed(8) }, //SET 4,H
-    0xE5 => { cpu.registers.l = cpu.registers.l | (1 << 4); Executed(8) }, //SET 4,L
-    0xE6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 4); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 4,(HL)
-    0xE7 => { cpu.registers.a = cpu.registers.a | (1 << 4); Executed(8) }, //SET 4,A
-    0xE8 => { cpu.registers.b = cpu.registers.b | (1 << 5); Executed(8) }, //SET 5,B
-    0xE9 => { cpu.registers.c = cpu.registers.c | (1 << 5); Executed(8) }, //SET 5,C
-    0xEA => { cpu.registers.d = cpu.registers.d | (1 << 5); Executed(8) }, //SET 5,D
-    0xEB => { cpu.registers.e = cpu.registers.e | (1 << 5); Executed(8) }, //SET 5,E
-    0xEC => { cpu.registers.h = cpu.registers.h | (1 << 5); Executed(8) }, //SET 5,H
-    0xED => { cpu.registers.l = cpu.registers.l | (1 << 5); Executed(8) }, //SET 5,L
-    0xEE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 5); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 5,(HL)
-    0xEF => { cpu.registers.a = cpu.registers.a | (1 << 5); Executed(8) }, //SET 5,A
-    0xF0 => { cpu.registers.b = cpu.registers.b | (1 << 6); Executed(8) }, //SET 6,B
-    0xF1 => { cpu.registers.c = cpu.registers.c | (1 << 6); Executed(8) }, //SET 6,C
-    0xF2 => { cpu.registers.d = cpu.registers.d | (1 << 6); Executed(8) }, //SET 6,D
-    0xF3 => { cpu.registers.e = cpu.registers.e | (1 << 6); Executed(8) }, //SET 6,E
-    0xF4 => { cpu.registers.h = cpu.registers.h | (1 << 6); Executed(8) }, //SET 6,H
-    0xF5 => { cpu.registers.l = cpu.registers.l | (1 << 6); Executed(8) }, //SET 6,L
-    0xF6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 6); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 6,(HL)
-    0xF7 => { cpu.registers.a = cpu.registers.a | (1 << 6); Executed(8) }, //SET 6,A
-    0xF8 => { cpu.registers.b = cpu.registers.b | (1 << 7); Executed(8) }, //SET 7,B
-    0xF9 => { cpu.registers.c = cpu.registers.c | (1 << 7); Executed(8) }, //SET 7,C
-    0xFA => { cpu.registers.d = cpu.registers.d | (1 << 7); Executed(8) }, //SET 7,D
-    0xFB => { cpu.registers.e = cpu.registers.e | (1 << 7); Executed(8) }, //SET 7,E
-    0xFC => { cpu.registers.h = cpu.registers.h | (1 << 7); Executed(8) }, //SET 7,H
-    0xFD => { cpu.registers.l = cpu.registers.l | (1 << 7); Executed(8) }, //SET 7,L
-    0xFE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | (1 << 7); cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 7,(HL)
-    0xFF => { cpu.registers.a = cpu.registers.a | (1 << 7); Executed(8) }, //SET 7,A
+    0x80 => { cpu.registers.b &= !0b0000_0001; Executed(8) }, //RES 0,B
+    0x81 => { cpu.registers.c &= !0b0000_0001; Executed(8) }, //RES 0,C
+    0x82 => { cpu.registers.d &= !0b0000_0001; Executed(8) }, //RES 0,D
+    0x83 => { cpu.registers.e &= !0b0000_0001; Executed(8) }, //RES 0,E
+    0x84 => { cpu.registers.h &= !0b0000_0001; Executed(8) }, //RES 0,H
+    0x85 => { cpu.registers.l &= !0b0000_0001; Executed(8) }, //RES 0,L
+    0x86 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0000_0001; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 0,(HL)
+    0x87 => { cpu.registers.a &= !0b0000_0001; Executed(8) }, //RES 0,A
+    0x88 => { cpu.registers.b &= !0b0000_0010; Executed(8) }, //RES 1,B
+    0x89 => { cpu.registers.c &= !0b0000_0010; Executed(8) }, //RES 1,C
+    0x8A => { cpu.registers.d &= !0b0000_0010; Executed(8) }, //RES 1,D
+    0x8B => { cpu.registers.e &= !0b0000_0010; Executed(8) }, //RES 1,E
+    0x8C => { cpu.registers.h &= !0b0000_0010; Executed(8) }, //RES 1,H
+    0x8D => { cpu.registers.l &= !0b0000_0010; Executed(8) }, //RES 1,L
+    0x8E => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0000_0010; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 1,(HL)
+    0x8F => { cpu.registers.a &= !0b0000_0010; Executed(8) }, //RES 1,A
+    0x90 => { cpu.registers.b &= !0b0000_0100; Executed(8) }, //RES 2,B
+    0x91 => { cpu.registers.c &= !0b0000_0100; Executed(8) }, //RES 2,C
+    0x92 => { cpu.registers.d &= !0b0000_0100; Executed(8) }, //RES 2,D
+    0x93 => { cpu.registers.e &= !0b0000_0100; Executed(8) }, //RES 2,E
+    0x94 => { cpu.registers.h &= !0b0000_0100; Executed(8) }, //RES 2,H
+    0x95 => { cpu.registers.l &= !0b0000_0100; Executed(8) }, //RES 2,L
+    0x96 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0000_0100; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 2,(HL)
+    0x97 => { cpu.registers.a &= !0b0000_0100; Executed(8) }, //RES 2,A
+    0x98 => { cpu.registers.b &= !0b0000_1000; Executed(8) }, //RES 3,B
+    0x99 => { cpu.registers.c &= !0b0000_1000; Executed(8) }, //RES 3,C
+    0x9A => { cpu.registers.d &= !0b0000_1000; Executed(8) }, //RES 3,D
+    0x9B => { cpu.registers.e &= !0b0000_1000; Executed(8) }, //RES 3,E
+    0x9C => { cpu.registers.h &= !0b0000_1000; Executed(8) }, //RES 3,H
+    0x9D => { cpu.registers.l &= !0b0000_1000; Executed(8) }, //RES 3,L
+    0x9E => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0000_1000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 3,(HL)
+    0x9F => { cpu.registers.a &= !0b0000_1000; Executed(8) }, //RES 3,A
+    0xA0 => { cpu.registers.b &= !0b0001_0000; Executed(8) }, //RES 4,B
+    0xA1 => { cpu.registers.c &= !0b0001_0000; Executed(8) }, //RES 4,C
+    0xA2 => { cpu.registers.d &= !0b0001_0000; Executed(8) }, //RES 4,D
+    0xA3 => { cpu.registers.e &= !0b0001_0000; Executed(8) }, //RES 4,E
+    0xA4 => { cpu.registers.h &= !0b0001_0000; Executed(8) }, //RES 4,H
+    0xA5 => { cpu.registers.l &= !0b0001_0000; Executed(8) }, //RES 4,L
+    0xA6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0001_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 4,(HL)
+    0xA7 => { cpu.registers.a &= !0b0001_0000; Executed(8) }, //RES 4,A
+    0xA8 => { cpu.registers.b &= !0b0010_0000; Executed(8) }, //RES 5,B
+    0xA9 => { cpu.registers.c &= !0b0010_0000; Executed(8) }, //RES 5,C
+    0xAA => { cpu.registers.d &= !0b0010_0000; Executed(8) }, //RES 5,D
+    0xAB => { cpu.registers.e &= !0b0010_0000; Executed(8) }, //RES 5,E
+    0xAC => { cpu.registers.h &= !0b0010_0000; Executed(8) }, //RES 5,H
+    0xAD => { cpu.registers.l &= !0b0010_0000; Executed(8) }, //RES 5,L
+    0xAE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0010_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 5,(HL)
+    0xAF => { cpu.registers.a &= !0b0010_0000; Executed(8) }, //RES 5,A
+    0xB0 => { cpu.registers.b &= !0b0100_0000; Executed(8) }, //RES 6,B
+    0xB1 => { cpu.registers.c &= !0b0100_0000; Executed(8) }, //RES 6,C
+    0xB2 => { cpu.registers.d &= !0b0100_0000; Executed(8) }, //RES 6,D
+    0xB3 => { cpu.registers.e &= !0b0100_0000; Executed(8) }, //RES 6,E
+    0xB4 => { cpu.registers.h &= !0b0100_0000; Executed(8) }, //RES 6,H
+    0xB5 => { cpu.registers.l &= !0b0100_0000; Executed(8) }, //RES 6,L
+    0xB6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b0100_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 6,(HL)
+    0xB7 => { cpu.registers.a &= !0b0100_0000; Executed(8) }, //RES 6,A
+    0xB8 => { cpu.registers.b &= !0b1000_0000; Executed(8) }, //RES 7,B
+    0xB9 => { cpu.registers.c &= !0b1000_0000; Executed(8) }, //RES 7,C
+    0xBA => { cpu.registers.d &= !0b1000_0000; Executed(8) }, //RES 7,D
+    0xBB => { cpu.registers.e &= !0b1000_0000; Executed(8) }, //RES 7,E
+    0xBC => { cpu.registers.h &= !0b1000_0000; Executed(8) }, //RES 7,H
+    0xBD => { cpu.registers.l &= !0b1000_0000; Executed(8) }, //RES 7,L
+    0xBE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  & !0b1000_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //RES 7,(HL)
+    0xBF => { cpu.registers.a &= !0b1000_0000; Executed(8) }, //RES 7,A
+    0xC0 => { cpu.registers.b |= 0b0000_0001; Executed(8) }, //SET 0,B
+    0xC1 => { cpu.registers.c |= 0b0000_0001; Executed(8) }, //SET 0,C
+    0xC2 => { cpu.registers.d |= 0b0000_0001; Executed(8) }, //SET 0,D
+    0xC3 => { cpu.registers.e |= 0b0000_0001; Executed(8) }, //SET 0,E
+    0xC4 => { cpu.registers.h |= 0b0000_0001; Executed(8) }, //SET 0,H
+    0xC5 => { cpu.registers.l |= 0b0000_0001; Executed(8) }, //SET 0,L
+    0xC6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0000_0001; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 0,(HL)
+    0xC7 => { cpu.registers.a |= 0b0000_0001; Executed(8) }, //SET 0,A
+    0xC8 => { cpu.registers.b |= 0b0000_0010; Executed(8) }, //SET 1,B
+    0xC9 => { cpu.registers.c |= 0b0000_0010; Executed(8) }, //SET 1,C
+    0xCA => { cpu.registers.d |= 0b0000_0010; Executed(8) }, //SET 1,D
+    0xCB => { cpu.registers.e |= 0b0000_0010; Executed(8) }, //SET 1,E
+    0xCC => { cpu.registers.h |= 0b0000_0010; Executed(8) }, //SET 1,H
+    0xCD => { cpu.registers.l |= 0b0000_0010; Executed(8) }, //SET 1,L
+    0xCE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0000_0010; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 1,(HL)
+    0xCF => { cpu.registers.a |= 0b0000_0010; Executed(8) }, //SET 1,A
+    0xD0 => { cpu.registers.b |= 0b0000_0100; Executed(8) }, //SET 2,B
+    0xD1 => { cpu.registers.c |= 0b0000_0100; Executed(8) }, //SET 2,C
+    0xD2 => { cpu.registers.d |= 0b0000_0100; Executed(8) }, //SET 2,D
+    0xD3 => { cpu.registers.e |= 0b0000_0100; Executed(8) }, //SET 2,E
+    0xD4 => { cpu.registers.h |= 0b0000_0100; Executed(8) }, //SET 2,H
+    0xD5 => { cpu.registers.l |= 0b0000_0100; Executed(8) }, //SET 2,L
+    0xD6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0000_0100; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 2,(HL)
+    0xD7 => { cpu.registers.a |= 0b0000_0100; Executed(8) }, //SET 2,A
+    0xD8 => { cpu.registers.b |= 0b0000_1000; Executed(8) }, //SET 3,B
+    0xD9 => { cpu.registers.c |= 0b0000_1000; Executed(8) }, //SET 3,C
+    0xDA => { cpu.registers.d |= 0b0000_1000; Executed(8) }, //SET 3,D
+    0xDB => { cpu.registers.e |= 0b0000_1000; Executed(8) }, //SET 3,E
+    0xDC => { cpu.registers.h |= 0b0000_1000; Executed(8) }, //SET 3,H
+    0xDD => { cpu.registers.l |= 0b0000_1000; Executed(8) }, //SET 3,L
+    0xDE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0000_1000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 3,(HL)
+    0xDF => { cpu.registers.a |= 0b0000_1000; Executed(8) }, //SET 3,A
+    0xE0 => { cpu.registers.b |= 0b0001_0000; Executed(8) }, //SET 4,B
+    0xE1 => { cpu.registers.c |= 0b0001_0000; Executed(8) }, //SET 4,C
+    0xE2 => { cpu.registers.d |= 0b0001_0000; Executed(8) }, //SET 4,D
+    0xE3 => { cpu.registers.e |= 0b0001_0000; Executed(8) }, //SET 4,E
+    0xE4 => { cpu.registers.h |= 0b0001_0000; Executed(8) }, //SET 4,H
+    0xE5 => { cpu.registers.l |= 0b0001_0000; Executed(8) }, //SET 4,L
+    0xE6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0001_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 4,(HL)
+    0xE7 => { cpu.registers.a |= 0b0001_0000; Executed(8) }, //SET 4,A
+    0xE8 => { cpu.registers.b |= 0b0010_0000; Executed(8) }, //SET 5,B
+    0xE9 => { cpu.registers.c |= 0b0010_0000; Executed(8) }, //SET 5,C
+    0xEA => { cpu.registers.d |= 0b0010_0000; Executed(8) }, //SET 5,D
+    0xEB => { cpu.registers.e |= 0b0010_0000; Executed(8) }, //SET 5,E
+    0xEC => { cpu.registers.h |= 0b0010_0000; Executed(8) }, //SET 5,H
+    0xED => { cpu.registers.l |= 0b0010_0000; Executed(8) }, //SET 5,L
+    0xEE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0010_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 5,(HL)
+    0xEF => { cpu.registers.a |= 0b0010_0000; Executed(8) }, //SET 5,A
+    0xF0 => { cpu.registers.b |= 0b0100_0000; Executed(8) }, //SET 6,B
+    0xF1 => { cpu.registers.c |= 0b0100_0000; Executed(8) }, //SET 6,C
+    0xF2 => { cpu.registers.d |= 0b0100_0000; Executed(8) }, //SET 6,D
+    0xF3 => { cpu.registers.e |= 0b0100_0000; Executed(8) }, //SET 6,E
+    0xF4 => { cpu.registers.h |= 0b0100_0000; Executed(8) }, //SET 6,H
+    0xF5 => { cpu.registers.l |= 0b0100_0000; Executed(8) }, //SET 6,L
+    0xF6 => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b0100_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 6,(HL)
+    0xF7 => { cpu.registers.a |= 0b0100_0000; Executed(8) }, //SET 6,A
+    0xF8 => { cpu.registers.b |= 0b1000_0000; Executed(8) }, //SET 7,B
+    0xF9 => { cpu.registers.c |= 0b1000_0000; Executed(8) }, //SET 7,C
+    0xFA => { cpu.registers.d |= 0b1000_0000; Executed(8) }, //SET 7,D
+    0xFB => { cpu.registers.e |= 0b1000_0000; Executed(8) }, //SET 7,E
+    0xFC => { cpu.registers.h |= 0b1000_0000; Executed(8) }, //SET 7,H
+    0xFD => { cpu.registers.l |= 0b1000_0000; Executed(8) }, //SET 7,L
+    0xFE => { let new_value = cpu.mmu.read_byte(cpu.registers.get_hl())  | 0b1000_0000; cpu.mmu.write_byte(cpu.registers.get_hl(), new_value); Executed(8) }, //SET 7,(HL)
+    0xFF => { cpu.registers.a |= 0b1000_0000; Executed(8) }, //SET 7,A
     _ => { cpu.halted = true; Executed(4) } //unreachable, but linux compiler will complain
   }
 }

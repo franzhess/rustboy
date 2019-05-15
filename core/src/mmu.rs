@@ -82,7 +82,7 @@ impl Mmu {
       0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
       0xFF10 ... 0xFF3F => (), //sound
-      0xFF46 => { self.voam_oam = value; self.copy_to_voam(value) },
+      0xFF46 => { self.voam_oam = value; self.copy_to_voam(value) }, //it's in front to capture it before it reaches the next line
       0xFF40 ... 0xFF4B => self.ppu.write_byte(address, value),
       0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,

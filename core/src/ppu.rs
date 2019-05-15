@@ -259,7 +259,7 @@ impl Ppu {
         current_tile = tile_selected_tile;
       }
 
-      self.screen_buffer[y][x] = (self.bg_palette >> color[bg_x_offset] * 2) & 0x03;
+      self.screen_buffer[y][x] = (self.bg_palette >> (color[bg_x_offset] * 2)) & 0x03;
       self.color_buffer[y][x] = color[bg_x_offset];
     }
   }
@@ -305,7 +305,7 @@ impl Ppu {
               if color[pixel] > 0 {
                 let screen_x = x + x_offset - 8;
                 if screen_x < 160 && !(self.color_buffer[self.line as usize][screen_x] > 0 && behind_bg) {
-                  self.screen_buffer[self.line as usize][screen_x] = (palette >> color[pixel] * 2) & 0x03;
+                  self.screen_buffer[self.line as usize][screen_x] = (palette >> (color[pixel] * 2)) & 0x03;
                 }
               }
             }

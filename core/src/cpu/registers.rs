@@ -1,9 +1,9 @@
 #[derive(Debug, Copy, Clone)]
 pub enum CpuFlag {
-  Z = 0b10000000, //zero
-  N = 0b01000000, //subtract
-  H = 0b00100000, //half carry
-  C = 0b00010000  //carry
+  Z = 0b1000_0000, //zero
+  N = 0b0100_0000, //subtract
+  H = 0b0010_0000, //half carry
+  C = 0b0001_0000  //carry
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -150,10 +150,12 @@ impl FlagRegister for Registers {
   }
 
   fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool) {
-    match value {
-      true => self.f |= cpu_flag as u8,
-      false => self.f &= !(cpu_flag as u8)
+    if value {
+      self.f |= cpu_flag as u8;
+    } else {
+      self.f &= !(cpu_flag as u8);
     }
+
     self.f &= 0xF0; // the lower bits are always 0
   }
 
