@@ -1,6 +1,6 @@
 use sdl2::audio::*;
 use sdl2::Sdl;
-use core::AUDIO_OUTPUT_FREQUENCY;
+use emulation::AUDIO_OUTPUT_FREQUENCY;
 use core::AUDIO_BUFFER_SIZE;
 use std::collections::vec_deque::VecDeque;
 
