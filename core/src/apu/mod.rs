@@ -5,29 +5,43 @@ mod wave;
 use crate::CPU_FREQUENCY;
 use crate::AUDIO_OUTPUT_FREQUENCY;
 use std::f64;
-use sample::signal::Signal;
-use sample::signal::ConstHz;
-use sample::signal::Square;
 use std::sync::mpsc::Sender;
 use std::thread::park;
 use crate::AUDIO_BUFFER_SIZE;
+use crate::apu::wave::Wave;
+use crate::apu::square::Tone;
+use crate::apu::noise::Noise;
 
 const FRAME_TICKS: usize = ((AUDIO_BUFFER_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
 
 pub struct Apu {
   audio_sender: Sender<Vec<i16>>,
-  signal: Square<ConstHz>,
   counter: usize,
+
+  channel_3: Wave,
+
+  /*channel_1: Tone,
+  channel_2: Tone,
+  channel_4: Noise*/
 }
 
 impl Apu {
   pub fn new(audio_sender: Sender<Vec<i16>>) -> Apu {
-    let signal = sample::signal::rate(AUDIO_OUTPUT_FREQUENCY as f64).const_hz(800 as f64).square();
-
     Apu {
       audio_sender,
-      signal,
       counter: 0,
+      channel_3: Wave::new()
+    }
+  }
+
+  pub fn read_byte(&self, address: u16) -> u8 {
+    0
+  }
+
+  pub fn write_byte(&mut self, address: u16, value: u8) {
+    match address {
+      0xFF30 ... 0xFF3F => self.channel_3.write_byte(address, value),
+      _ => ()
     }
   }
 
@@ -41,10 +55,11 @@ impl Apu {
   }
 
   fn generate_frame(&mut self) {
+    self.channel_3.run();
+
     let mut buffer = vec![];
-    for _x in 0 .. AUDIO_BUFFER_SIZE {
-      let amp = (1_000f64 * self.signal.next()[0]) as i16;
-      buffer.push(amp); //mono
+    for x in 0 .. AUDIO_BUFFER_SIZE {
+      buffer.push(self.channel_3.sound_buffer[x]); //mono
     }
     self.audio_sender.send(buffer).expect("Failed to send audio data!");
     park();
