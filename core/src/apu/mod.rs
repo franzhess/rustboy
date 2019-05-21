@@ -1,4 +1,4 @@
-mod square;
+mod tone;
 mod noise;
 mod wave;
 
@@ -9,60 +9,124 @@ use std::sync::mpsc::Sender;
 use std::thread::park;
 use crate::AUDIO_BUFFER_SIZE;
 use crate::apu::wave::Wave;
-use crate::apu::square::Tone;
+use crate::apu::tone::Tone;
 use crate::apu::noise::Noise;
 
-const FRAME_TICKS: usize = ((AUDIO_BUFFER_SIZE as f64 / AUDIO_OUTPUT_FREQUENCY as f64) * CPU_FREQUENCY as f64) as usize;
+const SAMPLE_TICKS: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
+const TIMER_TICKS: usize = CPU_FREQUENCY / 512; //timer clock is at 512hz
 
 pub struct Apu {
+  enabled: bool,
   audio_sender: Sender<Vec<i16>>,
   counter: usize,
+  buffer: Vec<i16>,
+  timer_counter: usize,
+  timer_step: usize,
 
-  channel_3: Wave,
-
-  /*channel_1: Tone,
+  channel_1: Tone,
   channel_2: Tone,
-  channel_4: Noise*/
+  channel_3: Wave,
+  channel_4: Noise
 }
 
 impl Apu {
   pub fn new(audio_sender: Sender<Vec<i16>>) -> Apu {
     Apu {
+      enabled: true,
       audio_sender,
       counter: 0,
-      channel_3: Wave::new()
+      buffer: vec![],
+      timer_counter: 0,
+      timer_step: 0,
+      channel_1: Tone::new(),
+      channel_2: Tone::new(),
+      channel_3: Wave::new(),
+      channel_4: Noise::new()
     }
   }
 
   pub fn read_byte(&self, address: u16) -> u8 {
-    0
+    match address {
+      0xFF26 => {
+        let mut ret = 0;
+        if self.enabled {
+          ret |= 0b1000_0000;
+        }
+        if self.channel_2.is_enabled() {
+          ret |= 0b0000_0010;
+        }
+        if self.channel_1.is_enabled() {
+          ret |= 0b0000_0001;
+        }
+        ret
+      },
+      _ => 0
+    }
   }
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
+      0xFF10 ... 0xFF14 => self.channel_1.write_byte(address, value),
+      0xFF16 ... 0xFF19 => self.channel_2.write_byte(address, value),
+      0xFF26 => self.set_enabled(value & 0b1000_0000 == 0b1000_0000),
       0xFF30 ... 0xFF3F => self.channel_3.write_byte(address, value),
       _ => ()
     }
   }
 
+  fn set_enabled(&mut self, play: bool) {
+    self.enabled = play;
+  }
+
   pub fn do_ticks(&mut self, ticks: usize) {
+    self.do_timer(ticks);
+
     self.counter += ticks;
 
-    while self.counter >= FRAME_TICKS {
-      self.generate_frame();
-      self.counter -= FRAME_TICKS;
+    self.channel_1.do_ticks(ticks);
+    self.channel_2.do_ticks(ticks);
+
+    while self.counter >= SAMPLE_TICKS {
+      self.counter -= SAMPLE_TICKS;
+
+      let ch1 = self.channel_1.get_sample();
+      let ch2 = self.channel_2.get_sample();
+
+      let (left, right) = self.mix(ch1, ch2);
+
+      self.buffer.push(left);
+      //self.buffer.push(right);
+
+      if self.buffer.len() >= AUDIO_BUFFER_SIZE {
+        self.audio_sender.send(self.buffer.clone());
+        self.buffer.clear();
+        park(); //wait until the main thread tells us to continue
+      }
     }
   }
 
-  fn generate_frame(&mut self) {
-    self.channel_3.run();
+  fn do_timer(&mut self, ticks: usize) {
+    self.timer_counter += ticks;
 
-    let mut buffer = vec![];
-    for x in 0 .. AUDIO_BUFFER_SIZE {
-      buffer.push(self.channel_3.sound_buffer[x]); //mono
+    while self.timer_counter >= TIMER_TICKS {
+      self.timer_counter -= TIMER_TICKS;
+
+      self.timer_step = ( self.timer_step + 1) % 8;
+
+      if self.timer_step % 2 == 0 {
+        self.channel_1.timer_step();
+        self.channel_2.timer_step();
+      }
+
+      //sweep @ 2,6
+      //vol env @ 7
     }
-    self.audio_sender.send(buffer).expect("Failed to send audio data!");
-    park();
+
+  }
+
+  fn mix(&self, ch1: i16, ch2: i16) -> (i16,i16) {
+    let amp = (ch1 + ch2) * 1000;
+    (amp, amp)
   }
 }
 

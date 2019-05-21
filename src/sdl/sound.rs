@@ -27,7 +27,7 @@ impl AudioCallback for SoundBuffer {
     for x in out.iter_mut() {
       *x = match self.queue.pop_front() {
         Some(x) => x,
-        None => { println!("Audio buffer underflow!"); 0 }
+        None => { /*println!("Audio buffer underflow!");*/ 0 }
       };
     }
   }

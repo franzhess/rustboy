@@ -265,6 +265,7 @@ impl Ppu {
   }
 
   fn render_window(&mut self) {
+    //@TODO implement
   }
 
   fn render_sprites(&mut self) {

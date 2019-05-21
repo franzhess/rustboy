@@ -2,7 +2,6 @@ use crate::AUDIO_BUFFER_SIZE;
 
 pub struct Wave {
   enabled: bool,
-  pub sound_buffer: [i16; AUDIO_BUFFER_SIZE],
   sound_length: u8,
   wave_pattern: [u8; 16]
 }
@@ -11,10 +10,13 @@ impl Wave {
   pub fn new() -> Wave {
     Wave {
       enabled: false,
-      sound_buffer: [0; AUDIO_BUFFER_SIZE],
       sound_length: 0,
       wave_pattern: [0; 16],
     }
+  }
+
+  pub fn is_enabled(&self) -> bool {
+    self.enabled
   }
 
   pub fn read_byte(&self, address: u16) -> u8 {
@@ -31,7 +33,6 @@ impl Wave {
   }
 
   pub fn run(&mut self) {
-    self.sound_buffer = [0; AUDIO_BUFFER_SIZE];
 
     if self.enabled {
 
