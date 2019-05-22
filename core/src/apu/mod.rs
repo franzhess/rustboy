@@ -52,6 +52,9 @@ impl Apu {
         if self.enabled {
           ret |= 0b1000_0000;
         }
+        if self.channel_3.is_enabled() {
+          ret |= 0b0000_0100;
+        }
         if self.channel_2.is_enabled() {
           ret |= 0b0000_0010;
         }
@@ -85,14 +88,16 @@ impl Apu {
 
     self.channel_1.do_ticks(ticks);
     self.channel_2.do_ticks(ticks);
+    self.channel_3.do_ticks(ticks);
 
     while self.counter >= SAMPLE_TICKS {
       self.counter -= SAMPLE_TICKS;
 
       let ch1 = self.channel_1.get_sample();
       let ch2 = self.channel_2.get_sample();
+      let ch3 = self.channel_3.get_sample();
 
-      let (left, right) = self.mix(ch1, ch2);
+      let (left, right) = self.mix(ch1, ch2, ch3);
 
       self.buffer.push(left);
       //self.buffer.push(right);
@@ -116,9 +121,12 @@ impl Apu {
       if self.timer_step % 2 == 0 {
         self.channel_1.timer_step();
         self.channel_2.timer_step();
+        self.channel_3.timer_step();
       }
 
-      //sweep @ 2,6
+      if self.timer_step == 2 || self.timer_step == 6 {
+        self.channel_1.sweep_step();
+      }
 
       if self.timer_step == 7 {
         self.channel_1.envelope_step();
@@ -128,8 +136,8 @@ impl Apu {
 
   }
 
-  fn mix(&self, ch1: i16, ch2: i16) -> (i16,i16) {
-    let amp = (ch1 + ch2) * 1000;
+  fn mix(&self, ch1: i16, ch2: i16, ch3: i16) -> (i16,i16) {
+    let amp = (ch1 + ch2 + ch3) * 1000;
     (amp, amp)
   }
 }
