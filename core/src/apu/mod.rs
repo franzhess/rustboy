@@ -119,7 +119,11 @@ impl Apu {
       }
 
       //sweep @ 2,6
-      //vol env @ 7
+
+      if self.timer_step == 7 {
+        self.channel_1.envelope_step();
+        self.channel_2.envelope_step();
+      }
     }
 
   }
@@ -127,6 +131,57 @@ impl Apu {
   fn mix(&self, ch1: i16, ch2: i16) -> (i16,i16) {
     let amp = (ch1 + ch2) * 1000;
     (amp, amp)
+  }
+}
+
+struct VolumeEnvelope {
+  volume: i16,
+  initial_volume: i16,
+  counter: usize,
+  period: usize,
+  increase: bool,
+}
+
+impl VolumeEnvelope {
+  pub fn new() -> VolumeEnvelope {
+    VolumeEnvelope {
+      volume: 0,
+      initial_volume: 0,
+      counter: 0,
+      period: 0,
+      increase: false
+    }
+  }
+
+  pub fn write_byte(&mut self, value: u8) {
+    self.initial_volume = ((value & 0xF0) >> 4) as i16;
+    self.increase = value & 0b0000_1000 == 0b0000_1000;
+    self.period = (value & 0b0000_0111) as usize;
+  }
+
+  pub fn get_volume(&self) -> i16 {
+    self.volume
+  }
+
+  pub fn reset(&mut self) {
+    self.counter = 0;
+    self.volume = self.initial_volume;
+  }
+
+  pub fn step(&mut self) {
+    if self.period > 0 {
+      self.counter += 1;
+
+      if self.counter >= self.period {
+        self.counter = 0;
+
+        if self.increase && self.volume < 15 {
+          self.volume += 1;
+        } else if !self.increase && self.volume > 0 {
+          self.volume -= 1;
+        }
+      }
+    }
   }
 }
 
