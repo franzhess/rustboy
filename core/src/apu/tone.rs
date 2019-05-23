@@ -146,9 +146,7 @@ impl Sweep {
           frequency + offset
         };
 
-        if new_frequency < 0 {
-          return 0
-        } else if new_frequency > 2048 {
+        if new_frequency > 2048 {
           return 2048
         } else {
           return new_frequency

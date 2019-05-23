@@ -43,7 +43,7 @@ fn main() {
       cpu_thread.thread().unpark();
     }
 
-    sleep(Duration::from_millis(5));
+    sleep(Duration::from_millis(1));  //sleep for a ms to not have this thread run at 100% cpu
   }
 
   sound.stop();

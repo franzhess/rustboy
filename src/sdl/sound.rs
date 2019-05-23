@@ -43,7 +43,7 @@ impl Sound {
 
     let desired_spec = AudioSpecDesired {
       freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
-      channels: Some(1), // stereo
+      channels: Some(2), // stereo
       samples: Some(AUDIO_BUFFER_SIZE as u16),
     };
 

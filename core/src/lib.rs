@@ -14,7 +14,7 @@ pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
 pub const AUDIO_OUTPUT_FREQUENCY: usize = 48_000;
-pub const AUDIO_BUFFER_SIZE: usize = 800;
+pub const AUDIO_BUFFER_SIZE: usize = 1600;
 
 use std::sync::mpsc::Receiver;
 use std::time::{Instant, Duration};

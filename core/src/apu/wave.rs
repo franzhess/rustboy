@@ -1,5 +1,3 @@
-use crate::AUDIO_BUFFER_SIZE;
-
 pub struct Wave {
   enabled: bool,
   length: usize,

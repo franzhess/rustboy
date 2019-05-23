@@ -4,13 +4,13 @@ mod wave;
 
 use crate::CPU_FREQUENCY;
 use crate::AUDIO_OUTPUT_FREQUENCY;
-use std::f64;
-use std::sync::mpsc::Sender;
-use std::thread::park;
 use crate::AUDIO_BUFFER_SIZE;
 use crate::apu::wave::Wave;
 use crate::apu::tone::Tone;
 use crate::apu::noise::Noise;
+
+use std::sync::mpsc::Sender;
+use std::thread::park;
 
 const SAMPLE_TICKS: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
 const TIMER_TICKS: usize = CPU_FREQUENCY / 512; //timer clock is at 512hz
@@ -101,10 +101,10 @@ impl Apu {
       let (left, right) = self.mixer.mix(ch1, ch2, ch3, ch4);
 
       self.buffer.push(left);
-      //self.buffer.push(right);
+      self.buffer.push(right);
 
       if self.buffer.len() >= AUDIO_BUFFER_SIZE {
-        self.audio_sender.send(self.buffer.clone());
+        self.audio_sender.send(self.buffer.clone()).expect("Failed to send audio buffer");
         self.buffer.clear();
         park(); //wait until the main thread tells us to continue
       }
@@ -248,13 +248,13 @@ impl Mixer {
     let mut right = if self.ch1_r { ch1 } else { 0 };
 
     if self.ch2_l { left += ch2 };
-    if self.ch2_r { left += ch2 };
+    if self.ch2_r { right += ch2 };
 
     if self.ch3_l { left += ch3 };
-    if self.ch3_r { left += ch3 };
+    if self.ch3_r { right += ch3 };
 
     if self.ch4_l { left += ch4 };
-    if self.ch4_r { left += ch4 };
+    if self.ch4_r { right += ch4 };
 
     (self.vol_left * left, self.vol_right * right)
   }
