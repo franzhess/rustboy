@@ -26,7 +26,9 @@ pub struct Apu {
   channel_1: Tone,
   channel_2: Tone,
   channel_3: Wave,
-  channel_4: Noise
+  channel_4: Noise,
+
+  mixer: Mixer
 }
 
 impl Apu {
@@ -41,7 +43,8 @@ impl Apu {
       channel_1: Tone::new(),
       channel_2: Tone::new(),
       channel_3: Wave::new(),
-      channel_4: Noise::new()
+      channel_4: Noise::new(),
+      mixer: Mixer::new()
     }
   }
 
@@ -49,18 +52,11 @@ impl Apu {
     match address {
       0xFF26 => {
         let mut ret = 0;
-        if self.enabled {
-          ret |= 0b1000_0000;
-        }
-        if self.channel_3.is_enabled() {
-          ret |= 0b0000_0100;
-        }
-        if self.channel_2.is_enabled() {
-          ret |= 0b0000_0010;
-        }
-        if self.channel_1.is_enabled() {
-          ret |= 0b0000_0001;
-        }
+        if self.enabled { ret |= 0b1000_0000; }
+        if self.channel_4.is_enabled() { ret |= 0b0000_1000; }
+        if self.channel_3.is_enabled() { ret |= 0b0000_0100; }
+        if self.channel_2.is_enabled() { ret |= 0b0000_0010; }
+        if self.channel_1.is_enabled() { ret |= 0b0000_0001; }
         ret
       },
       _ => 0
@@ -71,6 +67,9 @@ impl Apu {
     match address {
       0xFF10 ... 0xFF14 => self.channel_1.write_byte(address, value),
       0xFF16 ... 0xFF19 => self.channel_2.write_byte(address, value),
+      0xFF1A ... 0xFF1E => self.channel_3.write_byte(address, value),
+      0xFF20 ... 0xFF23 => self.channel_4.write_byte(address, value),
+      0xFF24 ... 0xFF25 => self.mixer.write_byte(address, value),
       0xFF26 => self.set_enabled(value & 0b1000_0000 == 0b1000_0000),
       0xFF30 ... 0xFF3F => self.channel_3.write_byte(address, value),
       _ => ()
@@ -89,6 +88,7 @@ impl Apu {
     self.channel_1.do_ticks(ticks);
     self.channel_2.do_ticks(ticks);
     self.channel_3.do_ticks(ticks);
+    self.channel_4.do_ticks(ticks);
 
     while self.counter >= SAMPLE_TICKS {
       self.counter -= SAMPLE_TICKS;
@@ -96,8 +96,9 @@ impl Apu {
       let ch1 = self.channel_1.get_sample();
       let ch2 = self.channel_2.get_sample();
       let ch3 = self.channel_3.get_sample();
+      let ch4 = self.channel_4.get_sample();
 
-      let (left, right) = self.mix(ch1, ch2, ch3);
+      let (left, right) = self.mixer.mix(ch1, ch2, ch3, ch4);
 
       self.buffer.push(left);
       //self.buffer.push(right);
@@ -122,6 +123,7 @@ impl Apu {
         self.channel_1.timer_step();
         self.channel_2.timer_step();
         self.channel_3.timer_step();
+        self.channel_4.timer_step();
       }
 
       if self.timer_step == 2 || self.timer_step == 6 {
@@ -131,14 +133,10 @@ impl Apu {
       if self.timer_step == 7 {
         self.channel_1.envelope_step();
         self.channel_2.envelope_step();
+        self.channel_4.envelope_step();
       }
     }
 
-  }
-
-  fn mix(&self, ch1: i16, ch2: i16, ch3: i16) -> (i16,i16) {
-    let amp = (ch1 + ch2 + ch3) * 1000;
-    (amp, amp)
   }
 }
 
@@ -193,47 +191,71 @@ impl VolumeEnvelope {
   }
 }
 
-/*
-       Square 1
-NR10 FF10 -PPP NSSS Sweep period, negate, shift
-NR11 FF11 DDLL LLLL Duty, Length load (64-L)
-NR12 FF12 VVVV APPP Starting volume, Envelope add mode, period
-NR13 FF13 FFFF FFFF Frequency LSB
-NR14 FF14 TL-- -FFF Trigger, Length enable, Frequency MSB
+struct Mixer {
+  vol_left: i16,
+  vol_right: i16,
 
-       Square 2
-     FF15 ---- ---- Not used
-NR21 FF16 DDLL LLLL Duty, Length load (64-L)
-NR22 FF17 VVVV APPP Starting volume, Envelope add mode, period
-NR23 FF18 FFFF FFFF Frequency LSB
-NR24 FF19 TL-- -FFF Trigger, Length enable, Frequency MSB
+  ch4_l: bool,
+  ch3_l: bool,
+  ch2_l: bool,
+  ch1_l: bool,
+  ch4_r: bool,
+  ch3_r: bool,
+  ch2_r: bool,
+  ch1_r: bool,
+}
 
-       Wave
-NR30 FF1A E--- ---- DAC power
-NR31 FF1B LLLL LLLL Length load (256-L)
-NR32 FF1C -VV- ---- Volume code (00=0%, 01=100%, 10=50%, 11=25%)
-NR33 FF1D FFFF FFFF Frequency LSB
-NR34 FF1E TL-- -FFF Trigger, Length enable, Frequency MSB
+impl Mixer {
+  pub fn new() -> Mixer {
+    Mixer {
+      vol_left: 0,
+      vol_right: 0,
 
-       Noise
-     FF1F ---- ---- Not used
-NR41 FF20 --LL LLLL Length load (64-L)
-NR42 FF21 VVVV APPP Starting volume, Envelope add mode, period
-NR43 FF22 SSSS WDDD Clock shift, Width mode of LFSR, Divisor code
-NR44 FF23 TL-- ---- Trigger, Length enable
+      ch4_l: false,
+      ch3_l: false,
+      ch2_l: false,
+      ch1_l: false,
+      ch4_r: false,
+      ch3_r: false,
+      ch2_r: false,
+      ch1_r: false,
+    }
+  }
 
-       Control/Status
-NR50 FF24 ALLL BRRR Vin L enable, Left vol, Vin R enable, Right vol
-NR51 FF25 NW21 NW21 Left enables, Right enables
-NR52 FF26 P--- NW21 Power control/status, Channel length statuses
+  pub fn write_byte(&mut self, address: u16, value: u8) {
+    match address {
+      0xFF24 => { //ignoring vin
+        self.vol_left = ((value & 0b0111_0000) >> 4) as i16;
+        self.vol_right = (value & 0b0000_0111) as i16;
+      },
+      0xFF25 => {
+        self.ch4_l = value & 0b1000_0000 == 0b1000_0000;
+        self.ch3_l = value & 0b0100_0000 == 0b0100_0000;
+        self.ch2_l = value & 0b0010_0000 == 0b0010_0000;
+        self.ch1_l = value & 0b0001_0000 == 0b0001_0000;
+        self.ch4_r = value & 0b0000_1000 == 0b0000_1000;
+        self.ch3_r = value & 0b0000_0100 == 0b0000_0100;
+        self.ch2_r = value & 0b0000_0010 == 0b0000_0010;
+        self.ch1_r = value & 0b0000_0001 == 0b0000_0001;
+      },
+      _ => ()
+    }
+  }
 
-       Not used
-     FF27 ---- ----
-     .... ---- ----
-     FF2F ---- ----
+  pub fn mix(&self, ch1: i16, ch2: i16, ch3: i16, ch4: i16) -> (i16,i16) {
 
-       Wave Table
-     FF30 0000 1111 Samples 0 and 1
-     ....
-     FF3F 0000 1111 Samples 30 and 31
-*/
+    let mut left = if self.ch1_l { ch1 } else { 0 };
+    let mut right = if self.ch1_r { ch1 } else { 0 };
+
+    if self.ch2_l { left += ch2 };
+    if self.ch2_r { left += ch2 };
+
+    if self.ch3_l { left += ch3 };
+    if self.ch3_r { left += ch3 };
+
+    if self.ch4_l { left += ch4 };
+    if self.ch4_r { left += ch4 };
+
+    (self.vol_left * left, self.vol_right * right)
+  }
+}

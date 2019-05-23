@@ -10,7 +10,7 @@ pub struct Wave {
   period: usize,
   length_enabled: bool,
   cursor: usize,
-  wave_pattern: [u8; 16]
+  wave_pattern: [i16; 32]
 }
 
 impl Wave {
@@ -19,7 +19,7 @@ impl Wave {
       enabled: false,
       length: 0,
       duration: 0,
-      wave_pattern: [0; 16],
+      wave_pattern: [0; 32],
       volume: 0,
       frequency: 2048,
       counter: 0,
@@ -57,7 +57,11 @@ impl Wave {
           self.duration = self.length;
         }
       },
-      0xFF30 ... 0xFF3F => self.wave_pattern[address as usize - 0xFF30] = value,
+      0xFF30 ... 0xFF3F => {
+        let offset = address as usize - 0xFF30;
+        self.wave_pattern[offset * 2] = (((value & 0xF0) >> 4) as i16) - 8;
+        self.wave_pattern[(offset * 2) + 1] = ((value & 0xF) as i16) - 8;
+      },
       _ => ()
     }
   }
@@ -80,7 +84,7 @@ impl Wave {
 
   pub fn get_sample(&self) -> i16 {
     if self.enabled && self.volume > 0 {
-      (self.wave_pattern[self.cursor] as i16) >> self.volume
+      self.wave_pattern[self.cursor] >> self.volume
     } else {
       0
     }

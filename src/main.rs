@@ -12,7 +12,7 @@ use core::cpu::Cpu;
 use core::mbc::load_rom;
 
 fn main() {
-  let rom = load_rom("roms/tetris.gb");
+  let rom = load_rom("roms/tetris.gb"); //cgb_sound/rom_singles/01-registers.gb");
   println!("Successfully loaded: {}", rom.name());
 
   let (video_sender, video_receiver) = mpsc::channel::<Vec<u8>>();

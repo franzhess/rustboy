@@ -12,7 +12,7 @@ pub struct Tone {
   counter: usize,
   phase: usize,   //which position in the waveform array
   period: usize, //ticks per period
-  volume_envleope: VolumeEnvelope,
+  volume_envelope: VolumeEnvelope,
   sweep: Sweep
 }
 
@@ -28,7 +28,7 @@ impl Tone {
       counter: 0,
       phase: 0,
       period: 1,
-      volume_envleope: VolumeEnvelope::new(),
+      volume_envelope: VolumeEnvelope::new(),
       sweep: Sweep::new()
     }
   }
@@ -48,7 +48,7 @@ impl Tone {
         self.length = 64 - (value & 0b0011_1111) as usize;
         self.duty = ((value & 0b1100_0000) >> 6) as usize;
       },
-      0xFF12 | 0xFF17 => self.volume_envleope.write_byte(value),
+      0xFF12 | 0xFF17 => self.volume_envelope.write_byte(value),
       0xFF13 | 0xFF18 => {
         self.frequency = (self.frequency & 0xFF00) | value as u16;
         self.update_period();
@@ -62,7 +62,7 @@ impl Tone {
         if value & 0b1000_0000 == 0b1000_0000 {
           self.enabled = true;
           self.duration = self.length;
-          self.volume_envleope.reset();
+          self.volume_envelope.reset();
         }
       },
       _ => ()
@@ -77,7 +77,7 @@ impl Tone {
   }
 
   pub fn envelope_step(&mut self) {
-    self.volume_envleope.step();
+    self.volume_envelope.step();
   }
 
   pub fn sweep_step(&mut self) {
@@ -96,7 +96,7 @@ impl Tone {
 
   pub fn get_sample(&self) -> i16 {
     if self.enabled {
-      self.volume_envleope.get_volume() * WAVE_PATTERN[self.duty][self.phase]
+      self.volume_envelope.get_volume() * WAVE_PATTERN[self.duty][self.phase]
     } else {
       0
     }
