@@ -10,9 +10,11 @@ use std::time::Duration;
 use core::*;
 use core::cpu::Cpu;
 use core::mbc::load_rom;
+use std::env;
 
 fn main() {
-  let rom = load_rom("roms/tetris.gb"); //cgb_sound/rom_singles/01-registers.gb");
+  let args: Vec<String> = env::args().collect();
+  let rom = load_rom(&args[1]);
   println!("Successfully loaded: {}", rom.name());
 
   let (video_sender, video_receiver) = mpsc::channel::<Vec<u8>>();
