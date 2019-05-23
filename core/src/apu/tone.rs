@@ -38,7 +38,20 @@ impl Tone {
   }
 
   pub fn read_byte(&self, address: u16) -> u8 {
-    0
+    match address {
+      0xFF10 => self.sweep.read_byte(),
+      0xFF11 | 0xFF16 => {
+        0
+      },
+      0xFF12 | 0xFF17 => self.volume_envelope.read_byte(),
+      0xFF13 | 0xFF18 => {
+        0
+      },
+      0xFF14 | 0xFF19 => {
+        0
+      },
+      _ => 0
+    }
   }
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
@@ -126,6 +139,10 @@ impl Sweep {
       subtraction: false,
       shift: 0
     }
+  }
+
+  pub fn read_byte(&self) -> u8 {
+    (self.period << 4 | if self.subtraction { 0b0000_1000 } else { 0 } | self.shift) as u8
   }
 
   pub fn write_byte(&mut self, value: u8) {

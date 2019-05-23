@@ -50,6 +50,11 @@ impl Apu {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
+      0xFF10 ... 0xFF14 => self.channel_1.read_byte(address),
+      0xFF16 ... 0xFF19 => self.channel_2.read_byte(address),
+      0xFF1A ... 0xFF1E => self.channel_3.read_byte(address),
+      0xFF20 ... 0xFF23 => self.channel_4.read_byte(address),
+      0xFF24 ... 0xFF25 => self.mixer.read_byte(address),
       0xFF26 => {
         let mut ret = 0;
         if self.enabled { ret |= 0b1000_0000; }
@@ -59,6 +64,7 @@ impl Apu {
         if self.channel_1.is_enabled() { ret |= 0b0000_0001; }
         ret
       },
+      0xFF30 ... 0xFF3F => self.channel_3.read_byte(address),
       _ => 0
     }
   }
@@ -159,6 +165,10 @@ impl VolumeEnvelope {
     }
   }
 
+  pub fn read_byte(&self) -> u8 {
+    (self.initial_volume as u8) << 4 | if self.increase { 0b0000_1000 } else { 0 } | self.period as u8
+  }
+
   pub fn write_byte(&mut self, value: u8) {
     self.initial_volume = ((value & 0xF0) >> 4) as i16;
     self.increase = value & 0b0000_1000 == 0b0000_1000;
@@ -219,6 +229,25 @@ impl Mixer {
       ch3_r: false,
       ch2_r: false,
       ch1_r: false,
+    }
+  }
+
+  pub fn read_byte(&self, address: u16) -> u8 {
+    match address {
+      0xFF24 => (self.vol_left << 4 | self.vol_right) as u8,
+      0xFF25 => {
+        let mut val = 0u8;
+        if self.ch4_l { val |= 0b1000_0000 };
+        if self.ch3_l { val |= 0b0100_0000 };
+        if self.ch2_l { val |= 0b0010_0000 };
+        if self.ch1_l { val |= 0b0001_0000 };
+        if self.ch4_r { val |= 0b0000_1000 };
+        if self.ch3_r { val |= 0b0000_0100 };
+        if self.ch2_r { val |= 0b0000_0010 };
+        if self.ch1_r { val |= 0b0000_0001 };
+        val
+      },
+      _ => 0
     }
   }
 

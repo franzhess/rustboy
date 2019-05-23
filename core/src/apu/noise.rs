@@ -34,7 +34,11 @@ impl Noise {
   }
 
   pub fn read_byte(&self, address: u16) -> u8 {
-    0
+    match address {
+      0xFF20 => self.length as u8,
+      0xFF21 => self.volume_envelope.read_byte(),
+      _ => 0
+    }
   }
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
