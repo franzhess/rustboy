@@ -14,9 +14,9 @@ pub enum OpCodeResult {
   UnknownOpCode
 }
 
-type UnaryOperation8 = fn(&mut FlagRegister, u8) -> u8;
-type BinaryOperation8 = fn(&mut FlagRegister, u8, u8) -> u8;
-type BinaryOperation16 = fn(&mut FlagRegister, u16, u16) -> u16;
+type UnaryOperation8 = fn(&mut dyn FlagRegister, u8) -> u8;
+type BinaryOperation8 = fn(&mut dyn FlagRegister, u8, u8) -> u8;
+type BinaryOperation16 = fn(&mut dyn FlagRegister, u16, u16) -> u16;
 
 pub struct Cpu {
   registers: Registers,
@@ -27,7 +27,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
-  pub fn new(rom: Box<Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Cpu {
+  pub fn new(rom: Box<dyn Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Cpu {
     Cpu {
       registers: Registers::new(),
       mmu: Mmu::new(rom, video_sender, audio_sender),

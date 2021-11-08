@@ -50,11 +50,11 @@ impl Apu {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
-      0xFF10 ... 0xFF14 => self.channel_1.read_byte(address),
-      0xFF16 ... 0xFF19 => self.channel_2.read_byte(address),
-      0xFF1A ... 0xFF1E => self.channel_3.read_byte(address),
-      0xFF20 ... 0xFF23 => self.channel_4.read_byte(address),
-      0xFF24 ... 0xFF25 => self.mixer.read_byte(address),
+      0xFF10 ..= 0xFF14 => self.channel_1.read_byte(address),
+      0xFF16 ..= 0xFF19 => self.channel_2.read_byte(address),
+      0xFF1A ..= 0xFF1E => self.channel_3.read_byte(address),
+      0xFF20 ..= 0xFF23 => self.channel_4.read_byte(address),
+      0xFF24 ..= 0xFF25 => self.mixer.read_byte(address),
       0xFF26 => {
         let mut ret = 0;
         if self.enabled { ret |= 0b1000_0000; }
@@ -64,20 +64,20 @@ impl Apu {
         if self.channel_1.is_enabled() { ret |= 0b0000_0001; }
         ret
       },
-      0xFF30 ... 0xFF3F => self.channel_3.read_byte(address),
+      0xFF30 ..= 0xFF3F => self.channel_3.read_byte(address),
       _ => 0
     }
   }
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0xFF10 ... 0xFF14 => self.channel_1.write_byte(address, value),
-      0xFF16 ... 0xFF19 => self.channel_2.write_byte(address, value),
-      0xFF1A ... 0xFF1E => self.channel_3.write_byte(address, value),
-      0xFF20 ... 0xFF23 => self.channel_4.write_byte(address, value),
-      0xFF24 ... 0xFF25 => self.mixer.write_byte(address, value),
+      0xFF10 ..= 0xFF14 => self.channel_1.write_byte(address, value),
+      0xFF16 ..= 0xFF19 => self.channel_2.write_byte(address, value),
+      0xFF1A ..= 0xFF1E => self.channel_3.write_byte(address, value),
+      0xFF20 ..= 0xFF23 => self.channel_4.write_byte(address, value),
+      0xFF24 ..= 0xFF25 => self.mixer.write_byte(address, value),
       0xFF26 => self.set_enabled(value & 0b1000_0000 == 0b1000_0000),
-      0xFF30 ... 0xFF3F => self.channel_3.write_byte(address, value),
+      0xFF30 ..= 0xFF3F => self.channel_3.write_byte(address, value),
       _ => ()
     }
   }

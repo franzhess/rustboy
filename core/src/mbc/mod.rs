@@ -39,7 +39,7 @@ pub trait Mbc : Send {
   }
 }
 
-pub fn load_rom(file_name: &str) -> Box<Mbc+'static> {
+pub fn load_rom(file_name: &str) -> Box<dyn Mbc+'static> {
   let mut buffer = vec![];
   let mut f = File::open(file_name).unwrap();
   f.read_to_end(&mut buffer).expect("Error reading ROM!");
@@ -50,10 +50,10 @@ pub fn load_rom(file_name: &str) -> Box<Mbc+'static> {
 
   match buffer[ADDR_CARTRIDGE_TYPE] {
     0x00 => Box::new(Mbc0::new(buffer)),
-    0x01...0x03 => Box::new(Mbc1::new(buffer)),
-    0x05...0x06 => Box::new(Mbc2::new(buffer)),
-    //0x0F...0x13 => "MBC3",
-    0x19...0x1E => Box::new(Mbc5::new(buffer)),
+    0x01..=0x03 => Box::new(Mbc1::new(buffer)),
+    0x05..=0x06 => Box::new(Mbc2::new(buffer)),
+    //0x0F..=0x13 => "MBC3",
+    0x19..=0x1E => Box::new(Mbc5::new(buffer)),
     v => panic!("Unsupported cartridge type {:#02X}", v)
   }
 }

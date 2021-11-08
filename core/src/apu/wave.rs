@@ -31,7 +31,7 @@ impl Wave {
     self.enabled
   }
 
-  pub fn read_byte(&self, address: u16) -> u8 {
+  pub fn read_byte(&self, _address: u16) -> u8 {
     0
   }
 
@@ -55,7 +55,7 @@ impl Wave {
           self.duration = self.length;
         }
       },
-      0xFF30 ... 0xFF3F => {
+      0xFF30 ..= 0xFF3F => {
         let offset = address as usize - 0xFF30;
         self.wave_pattern[offset * 2] = (((value & 0xF0) >> 4) as i16) - 8;
         self.wave_pattern[(offset * 2) + 1] = ((value & 0xF) as i16) - 8;

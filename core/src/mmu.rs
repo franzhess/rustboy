@@ -18,7 +18,7 @@ pub struct Mmu {
   apu: Apu,
   timer: Timer,
   pub joypad: Joypad,
-  mbc: Box<Mbc+'static>,
+  mbc: Box<dyn Mbc+'static>,
   serial: Serial,
   interrupt_enable: u8,
   interrupt_request: u8,
@@ -26,7 +26,7 @@ pub struct Mmu {
 }
 
 impl Mmu {
-  pub fn new(rom: Box<Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Mmu {
+  pub fn new(rom: Box<dyn Mbc>, video_sender: Sender<Vec<u8>>, audio_sender: Sender<Vec<i16>>) -> Mmu {
     Mmu {
       wram: [0; WRAM_SIZE],
       hram: [0; HRAM_SIZE],
@@ -44,21 +44,21 @@ impl Mmu {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
-      0x0000 ... 0x7FFF => self.mbc.read_rom(address), //ROM from cartridge
-      0x8000 ... 0x9FFF => self.ppu.read_byte(address), //VRAM
-      0xA000 ... 0xBFFF => self.mbc.read_ram(address - 0xA000),
-      0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000], //WRAM
-      0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000], //WRAM Echo
-      0xFE00 ... 0xFE9F => self.ppu.read_byte(address), //OAM
-      0xFEA0 ... 0xFEFF => 0, //not useable
+      0x0000 ..= 0x7FFF => self.mbc.read_rom(address), //ROM from cartridge
+      0x8000 ..= 0x9FFF => self.ppu.read_byte(address), //VRAM
+      0xA000 ..= 0xBFFF => self.mbc.read_ram(address - 0xA000),
+      0xC000 ..= 0xDFFF => self.wram[address as usize - 0xC000], //WRAM
+      0xE000 ..= 0xFDFF => self.wram[address as usize - 0xE000], //WRAM Echo
+      0xFE00 ..= 0xFE9F => self.ppu.read_byte(address), //OAM
+      0xFEA0 ..= 0xFEFF => 0, //not useable
       0xFF00 => self.joypad.read(), //Joypad
-      0xFF01 ... 0xFF02 => self.serial.read(address), //serial
-      0xFF04 ... 0xFF07 => self.timer.read_byte(address), //TIMER
+      0xFF01 ..= 0xFF02 => self.serial.read(address), //serial
+      0xFF04 ..= 0xFF07 => self.timer.read_byte(address), //TIMER
       0xFF0F => self.interrupt_request,
-      0xFF10 ... 0xFF3F => self.apu.read_byte(address), //sound
+      0xFF10 ..= 0xFF3F => self.apu.read_byte(address), //sound
       0xFF46 => self.voam_oam,
-      0xFF40 ... 0xFF4B => self.ppu.read_byte(address),
-      0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
+      0xFF40 ..= 0xFF4B => self.ppu.read_byte(address),
+      0xFF80 ..= 0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
       0xFFFF => self.interrupt_enable,
       _ => 0
     }
@@ -70,21 +70,21 @@ impl Mmu {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0x0000 ... 0x7FFF => self.mbc.write_rom(address, value), //ROM cartridge
-      0x8000 ... 0x9FFF => self.ppu.write_byte(address, value), //VRAM
-      0xA000 ... 0xBFFF => self.mbc.write_ram(address - 0xA000, value),
-      0xC000 ... 0xDFFF => self.wram[address as usize - 0xC000] = value, //WRAM
-      0xE000 ... 0xFDFF => self.wram[address as usize - 0xE000] = value, //WRAM Echo
-      0xFE00 ... 0xFE9F => self.ppu.write_byte(address, value), //OAM
-      0xFEA0 ... 0xFEFF => (), //not useable
+      0x0000 ..= 0x7FFF => self.mbc.write_rom(address, value), //ROM cartridge
+      0x8000 ..= 0x9FFF => self.ppu.write_byte(address, value), //VRAM
+      0xA000 ..= 0xBFFF => self.mbc.write_ram(address - 0xA000, value),
+      0xC000 ..= 0xDFFF => self.wram[address as usize - 0xC000] = value, //WRAM
+      0xE000 ..= 0xFDFF => self.wram[address as usize - 0xE000] = value, //WRAM Echo
+      0xFE00 ..= 0xFE9F => self.ppu.write_byte(address, value), //OAM
+      0xFEA0 ..= 0xFEFF => (), //not useable
       0xFF00 => self.joypad.write(value), //JOYPAD
-      0xFF01 ... 0xFF02 => self.serial.write(address, value), //serial
-      0xFF04 ... 0xFF07 => self.timer.write_byte(address, value), //timer
+      0xFF01 ..= 0xFF02 => self.serial.write(address, value), //serial
+      0xFF04 ..= 0xFF07 => self.timer.write_byte(address, value), //timer
       0xFF0F => self.interrupt_request = value,
-      0xFF10 ... 0xFF3F => self.apu.write_byte(address, value), //sound
+      0xFF10 ..= 0xFF3F => self.apu.write_byte(address, value), //sound
       0xFF46 => { self.voam_oam = value; self.copy_to_voam(value) }, //it's in front to capture it before it reaches the next line
-      0xFF40 ... 0xFF4B => self.ppu.write_byte(address, value),
-      0xFF80 ... 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
+      0xFF40 ..= 0xFF4B => self.ppu.write_byte(address, value),
+      0xFF80 ..= 0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
       0xFFFF => self.interrupt_enable = value,
       _ => {}
     }

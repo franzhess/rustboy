@@ -24,8 +24,8 @@ impl Mbc2 {
 impl Mbc for Mbc2 {
   fn read_rom(&self, address: u16) -> u8 {
     match address {
-      0x0000 ... 0x3FFF => self.rom[address as usize],
-      0x4000 ... 0x7FFF => self.rom[ROM_BANK_SIZE * self.selected_rom_bank + (address - 0x4000) as usize],
+      0x0000 ..= 0x3FFF => self.rom[address as usize],
+      0x4000 ..= 0x7FFF => self.rom[ROM_BANK_SIZE * self.selected_rom_bank + (address - 0x4000) as usize],
       _ => 0
     }
   }
@@ -41,8 +41,8 @@ impl Mbc for Mbc2 {
   fn write_rom(&mut self, address: u16, value: u8) {
     if address & 0x100 == 0x100 {
       match address {
-        0x0000...0x1FFF => self.ram_enabled = value == 0x0A,
-        0x2000...0x3FFF => self.selected_rom_bank = (value as usize) & 0xF,
+        0x0000..=0x1FFF => self.ram_enabled = value == 0x0A,
+        0x2000..=0x3FFF => self.selected_rom_bank = (value as usize) & 0xF,
         _ => ()
       }
     }

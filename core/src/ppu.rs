@@ -78,8 +78,8 @@ impl Ppu {
 
   pub fn read_byte(&self, address: u16) -> u8 {
     match address {
-      0x8000...0x9FFF => { let offset = address as usize - 0x8000; self.vram[offset] },
-      0xFE00...0xFE9F => { let offset = address as usize - 0xFE00; self.voam[offset] },
+      0x8000..=0x9FFF => { let offset = address as usize - 0x8000; self.vram[offset] },
+      0xFE00..=0xFE9F => { let offset = address as usize - 0xFE00; self.voam[offset] },
       0xFF40 => { // LCD Control
         (if self.lcd_enabled { 0x80 } else { 0x00 }) |
         (if self.window_tilemap_select { 0x40 } else { 0x00 }) |
@@ -113,8 +113,8 @@ impl Ppu {
 
   pub fn write_byte(&mut self, address: u16, value: u8) {
     match address {
-      0x8000...0x9FFF => { let offset = address as usize - 0x8000; self.vram[offset] = value; },
-      0xFE00...0xFE9F => { let offset = address as usize - 0xFE00; self.voam[offset] = value; },
+      0x8000..=0x9FFF => { let offset = address as usize - 0x8000; self.vram[offset] = value; },
+      0xFE00..=0xFE9F => { let offset = address as usize - 0xFE00; self.voam[offset] = value; },
       0xFF40 => {
         self.lcd_enabled = value & 0x80 == 0x80;
         self.window_tilemap_select = value & 0x40 == 0x40;

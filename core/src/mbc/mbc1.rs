@@ -35,8 +35,8 @@ impl Mbc1 {
 impl Mbc for Mbc1 {
   fn read_rom(&self, address: u16) -> u8 {
     match address {
-      0x0000 ... 0x3FFF => self.rom[address as usize],
-      0x4000 ... 0x7FFF => self.rom[ROM_BANK_SIZE * self.selected_rom_bank + (address - 0x4000) as usize],
+      0x0000 ..= 0x3FFF => self.rom[address as usize],
+      0x4000 ..= 0x7FFF => self.rom[ROM_BANK_SIZE * self.selected_rom_bank + (address - 0x4000) as usize],
       _ => 0
     }
   }
@@ -51,16 +51,16 @@ impl Mbc for Mbc1 {
 
   fn write_rom(&mut self, address: u16, value: u8) {
     match address {
-      0x0000 ... 0x1FFF => self.ram_enabled = value == 0x0A,
-      0x2000 ... 0x3FFF => self.selected_rom_bank = (self.selected_rom_bank & 0x60) | match value as usize & 0x1F {
+      0x0000 ..= 0x1FFF => self.ram_enabled = value == 0x0A,
+      0x2000 ..= 0x3FFF => self.selected_rom_bank = (self.selected_rom_bank & 0x60) | match value as usize & 0x1F {
         0 => 1,
         n => n,
       }, //lower 5 bits 0x01-0x1F higher bits 5+6 0x60
-      0x4000 ... 0x5FFF => match self.banking_mode {
+      0x4000 ..= 0x5FFF => match self.banking_mode {
         BankingMode::ROM => self.selected_rom_bank = (self.selected_rom_bank & 0x1F) | ((value as usize & 0x03) << 5 ) ,
         BankingMode::RAM => self.selected_ram_bank = value as usize
       },
-      0x6000 ... 0x7FFF => match value {
+      0x6000 ..= 0x7FFF => match value {
         0 => self.banking_mode = BankingMode::ROM,
         _ => self.banking_mode = BankingMode::RAM
       },
