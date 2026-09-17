@@ -58,6 +58,10 @@ impl Session {
 
 pub const FRAME_CYCLE_BUDGET: usize = CPU_FREQUENCY / 60;
 
+fn frame_sleep_duration(elapsed: Duration) -> Duration {
+    (Duration::from_secs(1) / 60).saturating_sub(elapsed)
+}
+
 pub fn advance_frame(
     session: &mut Session,
     outputs: &mut (impl FrameSink + AudioSink),
@@ -83,7 +87,7 @@ pub fn run(platform: &mut impl Platform, session: &mut Session) -> Result<(), St
             session.process_input(event);
         }
         advance_frame(session, platform)?;
-        sleep(Duration::from_secs(1).saturating_sub(slice_started.elapsed()) / 60);
+        sleep(frame_sleep_duration(slice_started.elapsed()));
     }
     Ok(())
 }
@@ -125,5 +129,20 @@ mod test {
         assert!(cycles >= FRAME_CYCLE_BUDGET);
         assert!(cycles <= FRAME_CYCLE_BUDGET + 24);
         assert_eq!(outputs.audio_buffers, 1);
+    }
+
+    #[test]
+    fn frame_sleep_only_waits_for_the_remaining_frame_budget() {
+        let frame = Duration::from_secs(1) / 60;
+
+        assert_eq!(frame_sleep_duration(Duration::ZERO), frame);
+        assert_eq!(
+            frame_sleep_duration(Duration::from_millis(5)),
+            frame - Duration::from_millis(5)
+        );
+        assert_eq!(
+            frame_sleep_duration(frame + Duration::from_millis(1)),
+            Duration::ZERO
+        );
     }
 }

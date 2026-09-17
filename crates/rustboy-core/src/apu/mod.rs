@@ -8,13 +8,13 @@ use crate::apu::wave::Wave;
 use crate::AUDIO_OUTPUT_FREQUENCY;
 use crate::CPU_FREQUENCY;
 
-const SAMPLE_TICKS: usize = CPU_FREQUENCY / AUDIO_OUTPUT_FREQUENCY;
 const TIMER_TICKS: usize = CPU_FREQUENCY / 512; //timer clock is at 512hz
+const AUDIO_BUFFER_SAMPLES: usize = 1600;
 
 pub struct Apu {
     enabled: bool,
     audio_buffers: Vec<Vec<i16>>,
-    counter: usize,
+    sample_clock: SampleClock,
     buffer: Vec<i16>,
     timer_counter: usize,
     timer_step: usize,
@@ -32,7 +32,7 @@ impl Apu {
         Apu {
             enabled: true,
             audio_buffers: Vec::new(),
-            counter: 0,
+            sample_clock: SampleClock::new(),
             buffer: vec![],
             timer_counter: 0,
             timer_step: 0,
@@ -95,16 +95,12 @@ impl Apu {
     pub fn do_ticks(&mut self, ticks: usize) {
         self.do_timer(ticks);
 
-        self.counter += ticks;
-
         self.channel_1.do_ticks(ticks);
         self.channel_2.do_ticks(ticks);
         self.channel_3.do_ticks(ticks);
         self.channel_4.do_ticks(ticks);
 
-        while self.counter >= SAMPLE_TICKS {
-            self.counter -= SAMPLE_TICKS;
-
+        for _ in 0..self.sample_clock.advance(ticks) {
             let ch1 = self.channel_1.get_sample();
             let ch2 = self.channel_2.get_sample();
             let ch3 = self.channel_3.get_sample();
@@ -115,7 +111,7 @@ impl Apu {
             self.buffer.push(left);
             self.buffer.push(right);
 
-            if self.buffer.len() >= 1600 {
+            if self.buffer.len() >= AUDIO_BUFFER_SAMPLES {
                 self.audio_buffers.push(std::mem::take(&mut self.buffer));
             }
         }
@@ -150,6 +146,23 @@ impl Apu {
                 self.channel_4.envelope_step();
             }
         }
+    }
+}
+
+struct SampleClock {
+    phase: usize,
+}
+
+impl SampleClock {
+    fn new() -> Self {
+        Self { phase: 0 }
+    }
+
+    fn advance(&mut self, ticks: usize) -> usize {
+        self.phase += ticks * AUDIO_OUTPUT_FREQUENCY;
+        let samples = self.phase / CPU_FREQUENCY;
+        self.phase %= CPU_FREQUENCY;
+        samples
     }
 }
 
@@ -323,5 +336,19 @@ impl Mixer {
         };
 
         (self.vol_left * left, self.vol_right * right)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SampleClock;
+    use crate::{AUDIO_OUTPUT_FREQUENCY, CPU_FREQUENCY};
+
+    #[test]
+    fn sample_clock_generates_the_configured_rate_over_one_second() {
+        let mut clock = SampleClock::new();
+
+        assert_eq!(clock.advance(CPU_FREQUENCY), AUDIO_OUTPUT_FREQUENCY);
+        assert_eq!(clock.phase, 0);
     }
 }

@@ -4,6 +4,20 @@
 
 The public entry point is `Machine`. Create a `Cartridge` with `Cartridge::from_bytes`, put it into a `Machine`, then call `Machine::step`. Each step executes one CPU instruction and returns its cycle count plus any completed video frame or audio buffers. A frontend, test runner, or debugger decides what to do with those effects.
 
+## Timing and T-cycles
+
+The original Game Boy is synchronized by a 4,194,304 Hz master clock. A **T-cycle** is one tick of that clock and is the smallest timing unit used by the core. CPU instructions take a multiple of four T-cycles; four T-cycles make one CPU **M-cycle** (machine cycle).
+
+The CPU, timer, PPU, and APU advance from the same T-cycle count. After executing an instruction, `Machine::step` passes its consumed T-cycles to each hardware component. This keeps timer edges, display modes, audio generation, and interrupts synchronized with CPU execution rather than with the host computer's wall clock.
+
+Frontends map emulated T-cycles to real time. The desktop application targets 4,194,304 T-cycles per second and sleeps only for the unused portion of each host frame. The APU uses a fractional sample clock so that 4,194,304 emulated T-cycles produce exactly 48,000 audio output frames per second, despite that ratio not being an integer.
+
+## Timing granularity
+
+Rustboy is **T-cycle-accounted**, not yet **M-cycle-executed**. Each `Machine::step` call completes one CPU instruction, then advances devices by that instruction's total T-cycle count. This keeps device clocks and instruction durations synchronized, and components such as the timer can process individual T-cycle edges inside that total.
+
+The core does not yet schedule every CPU memory read, write, and register update at its exact M-cycle bus phase. Hardware effects that depend on the ordering of a CPU write within a single M-cycle, such as some TIMA reload and HALT edge cases, therefore require future M-cycle or finer-grained CPU scheduling.
+
 ## The Game Boy machine
 
 A Game Boy program is a ROM cartridge containing instructions and game data. The machine runs those instructions while its hardware components share one 16-bit address space.
