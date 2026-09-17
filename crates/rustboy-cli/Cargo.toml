@@ -1,0 +1,17 @@
+[package]
+name = "rustboy-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "Command-line entry point for Rustboy."
+license = "MIT"
+
+[[bin]]
+name = "rustboy"
+path = "src/main.rs"
+
+[dependencies]
+rustboy-core = { path = "../rustboy-core" }
+rustboy-application = { path = "../rustboy-application" }
+rustboy-adapter-rom = { path = "../rustboy-adapter-rom" }
+rustboy-adapter-sdl3 = { path = "../rustboy-adapter-sdl3" }

@@ -1,0 +1,10 @@
+[package]
+name = "rustboy-application"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "Application ports and use cases for Rustboy."
+license = "MIT"
+
+[dependencies]
+rustboy-core = { path = "../rustboy-core" }

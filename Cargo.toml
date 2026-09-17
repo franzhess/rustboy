@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "crates/rustboy-core",
+    "crates/rustboy-application",
+    "crates/rustboy-adapter-rom",
+    "crates/rustboy-adapter-sdl3",
+    "crates/rustboy-cli",
+    "crates/rustboy-rom-tests",
+    "crates/rustboy-debugger",
+    "crates/rustboy-adapter-debugger-cli",
+]
+resolver = "2"

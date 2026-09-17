@@ -1,0 +1,19 @@
+[package]
+name = "rustboy-rom-tests"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "ROM conformance runner for Rustboy."
+license = "MIT"
+
+[[bin]]
+name = "rustboy-rom-tests"
+path = "src/main.rs"
+
+[dependencies]
+libtest-mimic = "0.8.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rustboy-core = { path = "../rustboy-core" }
+rustboy-application = { path = "../rustboy-application" }
+rustboy-adapter-rom = { path = "../rustboy-adapter-rom" }

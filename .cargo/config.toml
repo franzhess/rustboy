@@ -1,0 +1,3 @@
+[alias]
+emulate = "run -p rustboy-cli --release --"
+rom-tests = "run -p rustboy-rom-tests -- --ignored --test-threads=1"

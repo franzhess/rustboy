@@ -1,0 +1,14 @@
+[package]
+name = "rustboy-adapter-debugger-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "Terminal debugger adapter for Rustboy."
+license = "MIT"
+
+[[bin]]
+name = "rustboy-debugger"
+path = "src/main.rs"
+
+[dependencies]
+rustboy-debugger = { path = "../rustboy-debugger" }

@@ -1,0 +1,12 @@
+[package]
+name = "rustboy-adapter-rom"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "Filesystem and ZIP ROM loader for Rustboy."
+license = "MIT"
+
+[dependencies]
+rustboy-application = { path = "../rustboy-application" }
+rustboy-core = { path = "../rustboy-core" }
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }

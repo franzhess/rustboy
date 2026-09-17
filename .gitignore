@@ -1,0 +1,41 @@
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Editor and IDE state
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Local tooling and operating-system metadata
+.serena/
+.DS_Store
+Thumbs.db
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Coverage, profiling, and logs
+/coverage/
+/tarpaulin-report.html
+*.profraw
+*.profdata
+*.log
+
+# Emulator ROMs, saves, and extracted archives
+/roms/
+*.gb
+*.gbc
+*.gba
+*.sav
+*.srm
+*.zip
+
+# Locally copied SDL binaries and Windows debug symbols
+*.dll
+*.pdb

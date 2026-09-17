@@ -1,0 +1,12 @@
+[package]
+name = "rustboy-adapter-sdl3"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.73"
+description = "SDL3 input, video, and audio adapters for Rustboy."
+license = "MIT"
+
+[dependencies]
+rustboy-application = { path = "../rustboy-application" }
+rustboy-core = { path = "../rustboy-core" }
+sdl3 = "0.20.0"
