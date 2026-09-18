@@ -364,7 +364,7 @@ impl Ppu {
 
                     let sprite_start_address = sprite_id as usize * 16;
                     let sprite_line = if flip_y {
-                        y + self.sprite_size - line
+                        y + self.sprite_size - 1 - line
                     } else {
                         line - y
                     };
@@ -376,13 +376,16 @@ impl Ppu {
                     for x_offset in 0..8 {
                         let pixel = if flip_x { 7 - x_offset } else { x_offset };
                         if color[pixel] > 0 {
-                            let screen_x = x + x_offset - 8;
-                            if screen_x < 160
-                                && !(self.color_buffer[self.line as usize][screen_x] > 0
-                                    && behind_bg)
-                            {
-                                self.screen_buffer[self.line as usize][screen_x] =
-                                    (palette >> (color[pixel] * 2)) & 0x03;
+                            // OAM stores sprite X plus eight, so X values below eight leave
+                            // only the sprite's rightmost columns visible on the screen.
+                            if let Some(screen_x) = (x + x_offset).checked_sub(8) {
+                                if screen_x < 160
+                                    && !(self.color_buffer[self.line as usize][screen_x] > 0
+                                        && behind_bg)
+                                {
+                                    self.screen_buffer[self.line as usize][screen_x] =
+                                        (palette >> (color[pixel] * 2)) & 0x03;
+                                }
                             }
                         }
                     }
@@ -421,5 +424,32 @@ mod test {
         assert_eq!(result[5], 1);
         assert_eq!(result[6], 2);
         assert_eq!(result[7], 3);
+    }
+
+    #[test]
+    fn renders_the_visible_edge_of_a_left_clipped_sprite() {
+        let mut ppu = Ppu::new();
+        ppu.voam[156] = 16;
+        ppu.voam[157] = 1;
+        ppu.vram[0] = 0b0000_0001;
+
+        ppu.render_sprites();
+
+        assert_eq!(ppu.screen_buffer[0][0], 3);
+    }
+
+    #[test]
+    fn vertically_flipped_sprite_uses_its_bottom_source_row_first() {
+        let mut ppu = Ppu::new();
+        ppu.voam[156] = 16;
+        ppu.voam[157] = 8;
+        ppu.voam[159] = 0x40;
+        ppu.obj_palette_1 = 0b1110_0100;
+        ppu.vram[0] = 0b1000_0000;
+        ppu.vram[15] = 0b1000_0000;
+
+        ppu.render_sprites();
+
+        assert_eq!(ppu.screen_buffer[0][0], 2);
     }
 }
