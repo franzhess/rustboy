@@ -65,7 +65,7 @@ impl Mmu {
 
     pub fn read_word(&self, address: u16) -> u16 {
         //LSB FIRST
-        self.read_byte(address) as u16 | (self.read_byte(address + 1) as u16) << 8
+        self.read_byte(address) as u16 | (self.read_byte(address.wrapping_add(1)) as u16) << 8
     }
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
@@ -95,7 +95,7 @@ impl Mmu {
 
     pub fn write_word(&mut self, address: u16, value: u16) {
         self.write_byte(address, (value & 0x00FF) as u8); //LSB first
-        self.write_byte(address + 1, ((value & 0xFF00) >> 8) as u8);
+        self.write_byte(address.wrapping_add(1), ((value & 0xFF00) >> 8) as u8);
     }
 
     pub fn do_ticks(&mut self, ticks: usize) {
@@ -139,6 +139,39 @@ impl Mmu {
                 self.read_byte(mem_start + offset as u16),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Mmu;
+    use crate::mbc::Mbc;
+
+    struct TestMbc;
+
+    impl Mbc for TestMbc {
+        fn read_rom(&self, _address: u16) -> u8 {
+            0x12
+        }
+
+        fn read_ram(&self, _address: u16) -> u8 {
+            0
+        }
+
+        fn write_rom(&mut self, _address: u16, _value: u8) {}
+
+        fn write_ram(&mut self, _address: u16, _value: u8) {}
+    }
+
+    #[test]
+    fn word_access_wraps_at_the_end_of_memory() {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+        mmu.interrupt_enable = 0x34;
+
+        assert_eq!(mmu.read_word(0xFFFF), 0x1234);
+
+        mmu.write_word(0xFFFF, 0xABCD);
+        assert_eq!(mmu.interrupt_enable, 0xCD);
     }
 }
 

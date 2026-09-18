@@ -143,7 +143,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.jump_r();
                 Executed(12)
             } else {
-                cpu.registers.pc += 1;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(1);
                 Executed(8)
             }
         } //JR NZ,n
@@ -181,7 +181,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.jump_r();
                 Executed(12)
             } else {
-                cpu.registers.pc += 1;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(1);
                 Executed(8)
             }
         } //JR Z,n
@@ -218,7 +218,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.jump_r();
                 Executed(12)
             } else {
-                cpu.registers.pc += 1;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(1);
                 Executed(8)
             }
         } //JR NC,n
@@ -260,7 +260,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.jump_r();
                 Executed(12)
             } else {
-                cpu.registers.pc += 1;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(1);
                 Executed(8)
             }
         } //JR C,n
@@ -801,7 +801,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //JP NZ,nn
@@ -815,7 +815,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.call(address);
                 Executed(24)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //CALL NZ,nn
@@ -849,7 +849,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //JP Z,nn
@@ -863,7 +863,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.call(address);
                 Executed(24)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //CALL Z,nn
@@ -899,7 +899,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //JP NC,nn
@@ -910,7 +910,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.call(address);
                 Executed(24)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //CALL NC,nn
@@ -945,7 +945,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //JP C,nn
@@ -956,7 +956,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
                 cpu.call(address);
                 Executed(24)
             } else {
-                cpu.registers.pc += 2;
+                cpu.registers.pc = cpu.registers.pc.wrapping_add(2);
                 Executed(12)
             }
         } //CALL Z,nn

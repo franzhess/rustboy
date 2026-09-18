@@ -147,13 +147,13 @@ impl Cpu {
 
     fn fetch_byte(&mut self) -> u8 {
         let res = self.mmu.read_byte(self.registers.pc);
-        self.registers.pc += 1;
+        self.registers.pc = self.registers.pc.wrapping_add(1);
         res
     }
 
     fn fetch_word(&mut self) -> u16 {
         let res = self.mmu.read_word(self.registers.pc);
-        self.registers.pc += 2;
+        self.registers.pc = self.registers.pc.wrapping_add(2);
         res
     }
 
@@ -213,5 +213,53 @@ impl Cpu {
         let value2 = self.registers.get16(arg);
         let result = op(&mut self.registers, value1, value2);
         self.registers.set_hl(result);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{op_codes, Cpu};
+    use crate::cpu::registers::{CpuFlag, FlagRegister};
+    use crate::mbc::Mbc;
+
+    struct TestMbc;
+
+    impl Mbc for TestMbc {
+        fn read_rom(&self, _address: u16) -> u8 {
+            0
+        }
+
+        fn read_ram(&self, _address: u16) -> u8 {
+            0
+        }
+
+        fn write_rom(&mut self, _address: u16, _value: u8) {}
+
+        fn write_ram(&mut self, _address: u16, _value: u8) {}
+    }
+
+    #[test]
+    fn instruction_fetch_wraps_the_program_counter() {
+        let mut cpu = Cpu::new(Box::new(TestMbc));
+        cpu.registers.pc = 0xFFFF;
+
+        cpu.fetch_byte();
+        assert_eq!(cpu.registers.pc, 0);
+
+        cpu.registers.pc = 0xFFFE;
+        cpu.fetch_word();
+        assert_eq!(cpu.registers.pc, 0);
+    }
+
+    #[test]
+    fn not_taken_conditional_jump_wraps_while_skipping_its_operand() {
+        let mut cpu = Cpu::new(Box::new(TestMbc));
+        cpu.registers.pc = 0xFFFF;
+        cpu.registers.set_flag(CpuFlag::Z, true);
+
+        // PC already points to JR NZ's one-byte operand after its opcode was fetched.
+        op_codes::execute(0x20, &mut cpu);
+
+        assert_eq!(cpu.registers.pc, 0);
     }
 }
