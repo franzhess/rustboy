@@ -73,6 +73,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 
 ## Testing
 
+The post-integration ROM baseline and follow-up notes are in `docs/rom-conformance.md`.
+
 Run these checks after relevant changes:
 
 ```sh
@@ -94,9 +96,10 @@ runner, for example:
 cargo rom-tests -- acceptance/timer
 ```
 
-Set `RUSTBOY_TEST_ROMS` to use an alternate ROM-suite checkout. The runner supports eligible DMG
-ROMs with register or memory assertions; CGB, SGB, screenshot-only, and unsupported-cartridge
-tests are skipped.
+Set `RUSTBOY_TEST_ROMS` to use an alternate ROM-suite checkout. The runner selects DMG ROMs
+with register or memory assertions; tests without DMG support and screenshot-only tests are
+excluded. Unsupported cartridges currently return an internal skipped outcome that the trial
+wrapper reports as a failure; this runner-classification issue is tracked in the baseline notes.
 
 ## Git Workflow
 
