@@ -491,7 +491,13 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(8)
         } //LD (HL),L
         0x76 => {
-            cpu.halted = true;
+            if !cpu.ime && cpu.pending_interrupts() != 0 {
+                // With IME clear, HALT does not sleep when an enabled request already exists.
+                // Instead, the next opcode fetch retains PC once (the documented HALT bug).
+                cpu.halt_bug = true;
+            } else {
+                cpu.halted = true;
+            }
             Executed(4)
         } //HALT
         0x77 => {
@@ -1078,7 +1084,12 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(16)
         } //LD A,(nn)
         0xFB => {
-            cpu.ei_requested = 2;
+            // Repeating EI cannot postpone an enable that an earlier EI already scheduled.
+            // The first EI enables IME after the immediately following instruction, even when
+            // that instruction is another EI.
+            if cpu.ei_requested == 0 {
+                cpu.ei_requested = 2;
+            }
             Executed(4)
         } //EI enable interrupts
         //0xFC

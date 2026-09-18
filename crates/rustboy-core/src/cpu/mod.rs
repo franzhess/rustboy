@@ -26,8 +26,9 @@ pub struct Cpu {
     registers: Registers,
     mmu: Mmu,
     halted: bool,
-    ime: bool,           // interrupt master enable - set by DI and EI
-    ei_requested: usize, //EI has one cycle delay
+    halt_bug: bool,
+    ime: bool,        // Interrupt master enable, also modified by RETI and interrupt entry.
+    ei_requested: u8, // Instruction completions remaining before EI takes effect.
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,21 +49,13 @@ impl Cpu {
             registers: Registers::new(),
             mmu: Mmu::new(rom),
             halted: false,
-            ime: false,      //interrupt master enable
-            ei_requested: 0, //enable interrupt requested - in the original gameboy the enabling of the interrupts took two cycles (see tick)
+            halt_bug: false,
+            ime: false,
+            ei_requested: 0,
         }
     }
 
     pub fn tick(&mut self) -> CpuStepResult {
-        self.ei_requested = match self.ei_requested {
-            2 => 1,
-            1 => {
-                self.ime = true;
-                0
-            }
-            _ => 0,
-        };
-
         let result = if self.handle_irq() {
             // Interrupt entry is a five-M-cycle hardware sequence: acknowledge IF, push the
             // current PC, and load the vector. Devices continue running for all 20 T-cycles.
@@ -71,7 +64,16 @@ impl Cpu {
                 opcode: None,
             }
         } else if !self.halted {
-            self.do_cycle()
+            let result = self.do_cycle();
+            // EI itself consumes the first completion; the following instruction consumes
+            // the second. Interrupt entry and HALT idle are not instruction completions.
+            if self.ei_requested != 0 {
+                self.ei_requested -= 1;
+                if self.ei_requested == 0 {
+                    self.ime = true;
+                }
+            }
+            result
         } else {
             CpuStepResult {
                 cycles: 4,
@@ -117,7 +119,7 @@ impl Cpu {
         self.mmu.process_irq_requests(); //loads the irq requests into 0xFF0F
 
         let irq_requested = self.mmu.read_byte(0xFF0F);
-        let irq = self.mmu.read_byte(0xFFFF) & irq_requested & 0x1F;
+        let irq = self.pending_interrupts();
         if irq == 0 {
             return false;
         }
@@ -130,8 +132,15 @@ impl Cpu {
         }
 
         self.ime = false;
+        self.ei_requested = 0;
         let irq_num = irq.trailing_zeros(); //0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
 
+        if self.halt_bug {
+            // EI; HALT with an already pending interrupt returns to HALT. The suppressed
+            // increment belongs to interrupt entry, not the handler's first opcode fetch.
+            self.registers.pc = self.registers.pc.wrapping_sub(1);
+            self.halt_bug = false;
+        }
         self.push(self.registers.pc);
         self.registers.pc = (0x0040 + 8 * irq_num) as u16;
         self.mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));
@@ -167,7 +176,13 @@ impl Cpu {
 
     fn fetch_byte(&mut self) -> u8 {
         let res = self.mmu.read_byte(self.registers.pc);
-        self.registers.pc = self.registers.pc.wrapping_add(1);
+        if self.halt_bug {
+            // HALT with IME clear and an enabled pending interrupt reuses the opcode byte as
+            // the next instruction's first byte. The suppression applies to one fetch only.
+            self.halt_bug = false;
+        } else {
+            self.registers.pc = self.registers.pc.wrapping_add(1);
+        }
         res
     }
 
@@ -203,6 +218,10 @@ impl Cpu {
     fn jump_r(&mut self) {
         let offset = self.fetch_byte();
         self.registers.pc = self.registers.pc.wrapping_add(offset as i8 as i16 as u16);
+    }
+
+    fn pending_interrupts(&self) -> u8 {
+        self.mmu.read_byte(0xFFFF) & self.mmu.read_byte(0xFF0F) & 0x1F
     }
 
     fn execute(&mut self, op: UnaryOperation8, arg: RegisterName8) {
@@ -242,11 +261,11 @@ mod tests {
     use crate::cpu::registers::{CpuFlag, FlagRegister};
     use crate::mbc::Mbc;
 
-    struct TestMbc;
+    struct TestMbc(Vec<u8>);
 
     impl Mbc for TestMbc {
-        fn read_rom(&self, _address: u16) -> u8 {
-            0
+        fn read_rom(&self, address: u16) -> u8 {
+            self.0.get(address as usize).copied().unwrap_or(0)
         }
 
         fn read_ram(&self, _address: u16) -> u8 {
@@ -258,9 +277,25 @@ mod tests {
         fn write_ram(&mut self, _address: u16, _value: u8) {}
     }
 
+    fn cpu_with_program(program: &[u8]) -> Cpu {
+        let mut rom = vec![0; 0x100 + program.len()];
+        rom[0x100..].copy_from_slice(program);
+        rom[0x40] = 0x04; // VBlank handler: INC B; RETI
+        rom[0x41] = 0xD9;
+        let mut cpu = Cpu::new(Box::new(TestMbc(rom)));
+        cpu.registers.sp = 0xFFFE;
+        cpu
+    }
+
+    fn assert_step(cpu: &mut Cpu, cycles: usize, opcode: Option<u8>) {
+        let result = cpu.tick();
+        assert_eq!(result.cycles, cycles);
+        assert_eq!(result.opcode, opcode);
+    }
+
     #[test]
     fn instruction_fetch_wraps_the_program_counter() {
-        let mut cpu = Cpu::new(Box::new(TestMbc));
+        let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0xFFFF;
 
         cpu.fetch_byte();
@@ -273,7 +308,7 @@ mod tests {
 
     #[test]
     fn not_taken_conditional_jump_wraps_while_skipping_its_operand() {
-        let mut cpu = Cpu::new(Box::new(TestMbc));
+        let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0xFFFF;
         cpu.registers.set_flag(CpuFlag::Z, true);
 
@@ -285,7 +320,7 @@ mod tests {
 
     #[test]
     fn highest_priority_interrupt_consumes_twenty_cycles_and_ticks_devices() {
-        let mut cpu = Cpu::new(Box::new(TestMbc));
+        let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0x1234;
         cpu.registers.sp = 0xFFFE;
         cpu.ime = true;
@@ -317,7 +352,7 @@ mod tests {
 
     #[test]
     fn halt_idle_reports_no_opcode_but_waking_execution_does() {
-        let mut cpu = Cpu::new(Box::new(TestMbc));
+        let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0xC000;
         cpu.mmu.write_byte(0xC000, 0x76); // HALT
         cpu.mmu.write_byte(0xC001, 0x04); // INC B
@@ -334,5 +369,190 @@ mod tests {
         assert_eq!(result.cycles, 4);
         assert_eq!(result.opcode, Some(0x04));
         assert_eq!(cpu.registers.pc, 0xC002);
+    }
+
+    #[test]
+    fn ei_enables_interrupts_after_exactly_one_following_instruction() {
+        let mut cpu = cpu_with_program(&[0xFB, 0x00, 0x00]); // EI; NOP; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert!(!cpu.ime);
+        assert_step(&mut cpu, 4, Some(0x00));
+        assert!(cpu.ime);
+
+        assert_step(&mut cpu, 20, None);
+        assert_eq!(cpu.registers.pc, 0x0040);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0102);
+    }
+
+    #[test]
+    fn repeated_ei_does_not_delay_an_already_scheduled_enable() {
+        let mut cpu = cpu_with_program(&[0xFB, 0xFB, 0x00]); // EI; EI; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert_step(&mut cpu, 20, None);
+        assert_eq!(cpu.registers.pc, 0x0040);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0102);
+    }
+
+    #[test]
+    fn di_cancels_a_pending_ei_enable() {
+        let mut cpu = cpu_with_program(&[0xFB, 0xF3, 0x00, 0x00]); // EI; DI; NOP; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert_step(&mut cpu, 4, Some(0xF3));
+        assert_step(&mut cpu, 4, Some(0x00));
+        assert_step(&mut cpu, 4, Some(0x00));
+        assert!(!cpu.ime);
+        assert_eq!(cpu.registers.pc, 0x0104);
+        assert_eq!(cpu.mmu.read_byte(0xFF0F) & 1, 1);
+    }
+
+    #[test]
+    fn halt_bug_reuses_the_opcode_as_an_immediate_operand_once() {
+        let mut cpu = cpu_with_program(&[0x76, 0x3E, 0x00]); // HALT; LD A,n; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert!(!cpu.halted);
+        assert_step(&mut cpu, 8, Some(0x3E));
+        assert_eq!(cpu.registers.a, 0x3E);
+        assert_eq!(cpu.registers.pc, 0x0102);
+        assert_step(&mut cpu, 4, Some(0x00));
+        assert_eq!(cpu.registers.pc, 0x0103);
+    }
+
+    #[test]
+    fn halt_bug_executes_a_single_byte_instruction_twice() {
+        let mut cpu = cpu_with_program(&[0x76, 0x3C, 0x00]); // HALT; INC A; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+        let previous_a = cpu.registers.a;
+
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 4, Some(0x3C));
+        assert_eq!(cpu.registers.pc, 0x0101);
+        assert_step(&mut cpu, 4, Some(0x3C));
+        assert_eq!(cpu.registers.pc, 0x0102);
+        assert_eq!(cpu.registers.a, previous_a.wrapping_add(2));
+    }
+
+    #[test]
+    fn halt_bug_followed_by_rst_saves_the_rst_address() {
+        let mut cpu = cpu_with_program(&[0x76, 0xFF]); // HALT; RST $38
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 16, Some(0xFF));
+        assert_eq!(cpu.registers.pc, 0x0038);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0101);
+    }
+
+    #[test]
+    fn interrupt_entry_cancels_an_ei_scheduled_while_ime_was_enabled() {
+        let mut cpu = cpu_with_program(&[0xFB, 0x00]);
+        cpu.ime = true;
+        cpu.mmu.write_byte(0xFFFF, 0x05);
+        assert_step(&mut cpu, 4, Some(0xFB));
+
+        cpu.mmu.write_byte(0xFF0F, 0x05);
+        assert_step(&mut cpu, 20, None);
+        assert_step(&mut cpu, 4, Some(0x04)); // INC B, not a nested timer interrupt.
+        assert!(!cpu.ime);
+        assert_eq!(cpu.registers.pc, 0x0041);
+        assert_eq!(cpu.registers.sp, 0xFFFC);
+    }
+
+    #[test]
+    fn reti_enables_interrupt_service_at_the_next_boundary() {
+        let mut cpu = cpu_with_program(&[0xD9]); // RETI
+        cpu.registers.sp = 0xFFFC;
+        cpu.mmu.write_word(0xFFFC, 0x1234);
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 16, Some(0xD9));
+        assert!(cpu.ime);
+        assert_eq!(cpu.registers.pc, 0x1234);
+        assert_eq!(cpu.registers.sp, 0xFFFE);
+        assert_step(&mut cpu, 20, None);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x1234);
+    }
+
+    #[test]
+    fn halt_with_ime_enabled_wakes_into_interrupt_entry() {
+        let mut cpu = cpu_with_program(&[0x76, 0x00]);
+        cpu.ime = true;
+        cpu.mmu.write_byte(0xFFFF, 1);
+
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 4, None);
+        assert!(cpu.halted);
+        cpu.mmu.write_byte(0xFF0F, 1);
+        assert_step(&mut cpu, 20, None);
+        assert!(!cpu.halted);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0101);
+        assert_step(&mut cpu, 4, Some(0x04));
+        assert_eq!(cpu.registers.pc, 0x0041);
+    }
+
+    #[test]
+    fn disabled_and_unused_interrupt_bits_do_not_wake_halt() {
+        let mut cpu = cpu_with_program(&[0x76, 0x00]);
+        cpu.mmu.write_byte(0xFFFF, 0xE1);
+        cpu.mmu.write_byte(0xFF0F, 0xE4);
+
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 4, None);
+        assert!(cpu.halted);
+        assert_eq!(cpu.registers.pc, 0x0101);
+    }
+
+    #[test]
+    fn ei_halt_with_pending_interrupt_returns_to_halt_without_bugging_handler() {
+        let mut cpu = cpu_with_program(&[0xFB, 0x76, 0x00]); // EI; HALT; NOP
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 20, None);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0101);
+
+        let previous_b = cpu.registers.b;
+        assert_step(&mut cpu, 4, Some(0x04));
+        assert_eq!(cpu.registers.b, previous_b.wrapping_add(1));
+        assert_eq!(cpu.registers.pc, 0x0041);
+        assert_step(&mut cpu, 16, Some(0xD9));
+        assert_eq!(cpu.registers.pc, 0x0101);
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 4, None);
+        assert!(cpu.halted);
+    }
+
+    #[test]
+    fn ei_halt_without_pending_interrupt_returns_after_halt() {
+        let mut cpu = cpu_with_program(&[0xFB, 0x76, 0x00]);
+        cpu.mmu.write_byte(0xFFFF, 1);
+
+        assert_step(&mut cpu, 4, Some(0xFB));
+        assert_step(&mut cpu, 4, Some(0x76));
+        assert_step(&mut cpu, 4, None);
+        cpu.mmu.write_byte(0xFF0F, 1);
+        assert_step(&mut cpu, 20, None);
+        assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0102);
+        assert_step(&mut cpu, 4, Some(0x04));
+        assert_step(&mut cpu, 16, Some(0xD9));
+        assert_step(&mut cpu, 4, Some(0x00));
+        assert_eq!(cpu.registers.pc, 0x0103);
     }
 }

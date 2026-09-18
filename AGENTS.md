@@ -52,6 +52,25 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   `acceptance/interrupts/ie_push` still fails; interrupt dispatch does not yet model changes
   to IE during the stack writes of the interrupt-entry sequence.
 
+## EI and HALT Notes
+
+- EI takes effect after the following instruction completes. Repeated EI does not postpone
+  an existing enable; DI and interrupt entry cancel any pending enable. RETI enables IME
+  immediately for interrupt dispatch at the next instruction boundary.
+- HALT with IME clear and an enabled pending request suppresses one opcode-fetch PC increment.
+  Otherwise HALT waits for an enabled request; with IME clear it resumes without servicing it.
+- EI followed by HALT with a request already pending saves the HALT address on interrupt entry
+  and clears the fetch-suppression flag before the handler runs.
+- Mooneye `ei_sequence`, `ei_timing`, `rapid_di_ei`, and `halt_ime1_timing` pass. The other three
+  `acceptance/halt_*` tests, `di_timing-GS`, and `reti_timing` still time out in the ROM runner.
+- The EI/HALT integration makes `gbmicrotest/halt_op_dupe` and `int_hblank_halt_bug_b` pass,
+  but changes `gbmicrotest/halt_bug` from passing to failing. That test sums timer reads:
+  it now reports `0x16` instead of `0x14`. The old path incorrectly executed the post-HALT
+  INC only once; the corrected path executes it twice. Investigate the remaining timing
+  mismatch rather than removing fetch suppression. Existing opcode timing errors observed
+  in its trace include JP a16 taking 12 instead of 16 T-cycles and ADD A,(HL) taking 4 instead
+  of 8 T-cycles.
+
 ## Testing
 
 Run these checks after relevant changes:
