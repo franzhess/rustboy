@@ -34,9 +34,12 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - TAC selects divider bits 9, 3, 5, and 7 for frequency settings 0 through 3; TIMA increments on
   a falling edge of the enabled selected signal.
 - Writing DIV, changing TAC, and disabling TAC can all create a falling edge and increment TIMA.
-- The current main branch implements divider edges. Delayed TIMA reload behavior is on the next
-  review branch. Before it lands, Mooneye `acceptance/timer` is expected to pass 10 of 13 tests;
-  the three reload tests fail.
+- TIMA overflow exposes zero, then reloads from TMA and requests an interrupt four T-cycles later.
+  Writing TIMA during the pending delay cancels the reload and interrupt; writing TMA changes
+  the value used by the reload. Disabling TAC does not cancel a pending reload.
+- Mooneye `acceptance/timer` passes 11 of 13 tests, including `tima_reload`.
+  `tima_write_reloading` and `tma_write_reloading` still fail: reload-cycle write priority
+  requires CPU M-cycle scheduling and corresponding timer reload-cycle handling.
 
 ## Testing
 

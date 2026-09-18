@@ -7,6 +7,7 @@ pub struct Timer {
     timer_modulo: u8,
     timer_enabled: bool,
     timer_bit: u8,
+    reload_delay: Option<u8>,
 }
 
 impl Timer {
@@ -20,6 +21,7 @@ impl Timer {
             timer_modulo: 0,
             timer_enabled: false,
             timer_bit: 7,
+            reload_delay: None,
         }
     }
 
@@ -53,7 +55,14 @@ impl Timer {
                 self.divider = 0;
                 self.increment_on_falling_edge(previous_signal);
             }
-            0xFF05 => self.timer_counter = value,
+            0xFF05 => {
+                // Instructions currently perform their write before advancing their aggregate
+                // T-cycles. In that ordering, a TIMA write while a reload is pending occurs
+                // before the transfer and cancels it. Reload-cycle bus priority needs CPU
+                // M-cycle scheduling, which is deliberately kept outside this timer commit.
+                self.reload_delay = None;
+                self.timer_counter = value;
+            }
             0xFF06 => self.timer_modulo = value,
             0xFF07 => {
                 // TAC changes the timer's input multiplexer immediately. A transition from the
@@ -78,6 +87,8 @@ impl Timer {
         // The CPU advances devices in instruction-sized batches. Stepping the divider one
         // T-cycle at a time preserves every selected-bit edge within those batches.
         for _ in 0..ticks {
+            self.advance_reload_delay();
+
             let previous_signal = self.timer_signal();
             self.divider = self.divider.wrapping_add(1);
             self.increment_on_falling_edge(previous_signal);
@@ -90,15 +101,30 @@ impl Timer {
 
     fn increment_on_falling_edge(&mut self, previous_signal: bool) {
         if previous_signal && !self.timer_signal() {
-            // The timer is clocked by a falling edge, not by a periodic accumulator. Overflow
-            // reload timing is intentionally handled separately from edge detection.
-            self.timer_counter = match self.timer_counter {
-                0xFF => {
-                    self.irq_timer = true;
-                    self.timer_modulo
-                }
-                _ => self.timer_counter + 1,
-            };
+            // A TIMA overflow first exposes 0x00. The TMA reload and interrupt request happen
+            // four T-cycles later, so code can observe and alter the intermediate state.
+            if self.timer_counter == 0xFF {
+                self.timer_counter = 0;
+                self.reload_delay = Some(4);
+            } else {
+                self.timer_counter += 1;
+            }
+        }
+    }
+
+    fn advance_reload_delay(&mut self) {
+        let Some(delay) = self.reload_delay else {
+            return;
+        };
+
+        if delay == 1 {
+            // TMA is sampled when the delayed reload occurs, so writes to TMA during the
+            // overflow window alter the value that becomes visible in TIMA.
+            self.timer_counter = self.timer_modulo;
+            self.irq_timer = true;
+            self.reload_delay = None;
+        } else {
+            self.reload_delay = Some(delay - 1);
         }
     }
 }
@@ -106,6 +132,13 @@ impl Timer {
 #[cfg(test)]
 mod tests {
     use super::Timer;
+
+    fn timer_about_to_overflow() -> Timer {
+        let mut timer = Timer::new();
+        timer.write_byte(0xFF05, 0xFF);
+        timer.write_byte(0xFF07, 0x05);
+        timer
+    }
 
     #[test]
     fn increments_tima_on_each_selected_divider_falling_edge() {
@@ -159,5 +192,98 @@ mod tests {
         timer.write_byte(0xFF07, 0x01);
 
         assert_eq!(timer.read_byte(0xFF05), 1);
+    }
+
+    #[test]
+    fn reloads_tima_and_requests_an_interrupt_four_cycles_after_overflow() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+
+        timer.do_ticks(16);
+        assert_eq!(timer.read_byte(0xFF05), 0);
+        assert!(!timer.irq_timer);
+
+        timer.do_ticks(3);
+        assert_eq!(timer.read_byte(0xFF05), 0);
+        assert!(!timer.irq_timer);
+
+        timer.do_ticks(1);
+        assert_eq!(timer.read_byte(0xFF05), 0xAB);
+        assert!(timer.irq_timer);
+    }
+
+    #[test]
+    fn writing_tima_during_the_overflow_window_cancels_the_reload() {
+        let mut timer = timer_about_to_overflow();
+
+        timer.do_ticks(16);
+        timer.write_byte(0xFF05, 0x42);
+        timer.do_ticks(4);
+
+        assert_eq!(timer.read_byte(0xFF05), 0x42);
+        assert!(!timer.irq_timer);
+    }
+
+    #[test]
+    fn reload_uses_tma_written_during_the_overflow_window() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+
+        timer.do_ticks(16);
+        timer.write_byte(0xFF06, 0xCD);
+        timer.do_ticks(4);
+
+        assert_eq!(timer.read_byte(0xFF05), 0xCD);
+        assert!(timer.irq_timer);
+    }
+
+    #[test]
+    fn reloads_and_continues_counting_within_one_tick_batch() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+
+        // Overflow at cycle 16, reload at 20, and another falling edge at 32.
+        timer.do_ticks(32);
+
+        assert_eq!(timer.read_byte(0xFF05), 0xAC);
+        assert!(timer.irq_timer);
+    }
+
+    #[test]
+    fn register_induced_overflows_use_the_same_reload_delay() {
+        for (address, value) in [(0xFF04, 0), (0xFF07, 0x06), (0xFF07, 0x01)] {
+            let mut timer = timer_about_to_overflow();
+            timer.write_byte(0xFF06, 0xAB);
+            timer.do_ticks(8);
+
+            // Reset DIV, select a low divider bit, or disable the timer while high.
+            timer.write_byte(address, value);
+            assert_eq!(timer.read_byte(0xFF05), 0);
+            assert!(!timer.irq_timer);
+
+            timer.do_ticks(3);
+            assert_eq!(timer.read_byte(0xFF05), 0);
+            assert!(!timer.irq_timer);
+
+            timer.do_ticks(1);
+            assert_eq!(timer.read_byte(0xFF05), 0xAB);
+            assert!(timer.irq_timer);
+        }
+    }
+
+    #[test]
+    fn disabling_timer_does_not_cancel_a_pending_reload() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+        timer.do_ticks(16);
+
+        timer.write_byte(0xFF07, 0);
+        timer.do_ticks(3);
+        assert_eq!(timer.read_byte(0xFF05), 0);
+        assert!(!timer.irq_timer);
+
+        timer.do_ticks(1);
+        assert_eq!(timer.read_byte(0xFF05), 0xAB);
+        assert!(timer.irq_timer);
     }
 }
