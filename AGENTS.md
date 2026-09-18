@@ -19,8 +19,9 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 
 - The master clock is 4,194,304 Hz. The core uses T-cycles throughout; four T-cycles are one
   CPU M-cycle.
-- `Machine::step` completes one instruction and advances CPU-driven devices by that instruction's
-  total T-cycles. Devices must remain synchronized to this shared count, never host time.
+- `Machine::step` executes one instruction, services an interrupt (20 T-cycles), or idles in
+  HALT (4 T-cycles), advancing devices by that step's total T-cycles. Its opcode is `None`
+  for interrupt entry and HALT idle. Devices share this cycle count, never host time.
 - The core is T-cycle-accounted but not M-cycle-executed. It does not yet schedule CPU bus reads,
   writes, and register updates within their exact M-cycle phases.
 - Model hardware edges inside instruction-sized batches when required. The timer, for example,
@@ -40,6 +41,16 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - Mooneye `acceptance/timer` passes 11 of 13 tests, including `tima_reload`.
   `tima_write_reloading` and `tma_write_reloading` still fail: reload-cycle write priority
   requires CPU M-cycle scheduling and corresponding timer reload-cycle handling.
+
+## Interrupt Notes
+
+- Interrupt entry consumes 20 T-cycles without executing a handler instruction in that step.
+  It clears IME, acknowledges the highest-priority enabled request, and saves the return PC.
+- Execution tracing and ROM exit-opcode detection use the opcode returned by `Machine::step`,
+  not the speculative `next_opcode` peek.
+- Mooneye `acceptance/intr_timing` and `acceptance/reti_intr_timing` pass.
+  `acceptance/interrupts/ie_push` still fails; interrupt dispatch does not yet model changes
+  to IE during the stack writes of the interrupt-entry sequence.
 
 ## Testing
 

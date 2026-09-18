@@ -43,6 +43,7 @@ pub struct ButtonEvent {
 
 pub struct StepResult {
     pub cycles: usize,
+    /// The opcode executed by this step; absent during interrupt entry or HALT idle.
     pub opcode: Option<u8>,
     pub frame: Option<Vec<u8>>,
     pub audio_buffers: Vec<Vec<i16>>,
@@ -60,11 +61,10 @@ impl Machine {
     }
 
     pub fn step(&mut self) -> StepResult {
-        let opcode = self.cpu.next_opcode();
-        let cycles = self.cpu.tick();
+        let result = self.cpu.tick();
         StepResult {
-            cycles,
-            opcode,
+            cycles: result.cycles,
+            opcode: result.opcode,
             frame: self.cpu.take_frame(),
             audio_buffers: self.cpu.take_audio_buffers(),
         }
@@ -78,6 +78,7 @@ impl Machine {
         self.cpu.read_byte(address)
     }
 
+    /// Peeks at the current PC when awake; interrupt entry may precede its execution.
     pub fn next_opcode(&self) -> Option<u8> {
         self.cpu.next_opcode()
     }

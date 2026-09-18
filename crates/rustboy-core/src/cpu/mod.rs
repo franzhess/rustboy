@@ -13,6 +13,11 @@ pub enum OpCodeResult {
     UnknownOpCode,
 }
 
+pub struct CpuStepResult {
+    pub cycles: usize,
+    pub opcode: Option<u8>,
+}
+
 type UnaryOperation8 = fn(&mut dyn FlagRegister, u8) -> u8;
 type BinaryOperation8 = fn(&mut dyn FlagRegister, u8, u8) -> u8;
 type BinaryOperation16 = fn(&mut dyn FlagRegister, u16, u16) -> u16;
@@ -48,10 +53,7 @@ impl Cpu {
         }
     }
 
-    pub fn tick(&mut self) -> usize {
-        //, input_state: [bool; 8]) -> usize {
-        //self.mmu.set_joypad_state(input_state);
-
+    pub fn tick(&mut self) -> CpuStepResult {
         self.ei_requested = match self.ei_requested {
             2 => 1,
             1 => {
@@ -61,13 +63,25 @@ impl Cpu {
             _ => 0,
         };
 
-        self.handle_irq();
+        let result = if self.handle_irq() {
+            // Interrupt entry is a five-M-cycle hardware sequence: acknowledge IF, push the
+            // current PC, and load the vector. Devices continue running for all 20 T-cycles.
+            CpuStepResult {
+                cycles: 20,
+                opcode: None,
+            }
+        } else if !self.halted {
+            self.do_cycle()
+        } else {
+            CpuStepResult {
+                cycles: 4,
+                opcode: None,
+            }
+        };
 
-        let ticks = if !self.halted { self.do_cycle() } else { 4 };
+        self.mmu.do_ticks(result.cycles);
 
-        self.mmu.do_ticks(ticks);
-
-        ticks
+        result
     }
 
     pub fn next_opcode(&self) -> Option<u8> {
@@ -99,40 +113,42 @@ impl Cpu {
         self.mmu.take_audio_buffers()
     }
 
-    fn handle_irq(&mut self) {
+    fn handle_irq(&mut self) -> bool {
         self.mmu.process_irq_requests(); //loads the irq requests into 0xFF0F
 
         let irq_requested = self.mmu.read_byte(0xFF0F);
         let irq = self.mmu.read_byte(0xFFFF) & irq_requested & 0x1F;
-        if irq > 0 {
-            //there was an interrupt
-            self.halted = false; //end halt when an interrupt occurs
-
-            if self.ime {
-                //if interrupts are enabled, handle them
-                self.ime = false; //don´t allow new interrupts until we handled this one
-
-                let irq_num = irq.trailing_zeros(); //0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
-
-                self.push(self.registers.pc);
-                self.registers.pc = (0x0040 + 8 * irq_num) as u16; // jump to the interrupt handler
-
-                self.mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num)); //reset the irq request - like res
-            }
+        if irq == 0 {
+            return false;
         }
+
+        // Any enabled request wakes HALT, even when IME is clear and the CPU must defer the
+        // actual interrupt service. The HALT-bug fetch behavior is handled separately.
+        self.halted = false;
+        if !self.ime {
+            return false;
+        }
+
+        self.ime = false;
+        let irq_num = irq.trailing_zeros(); //0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
+
+        self.push(self.registers.pc);
+        self.registers.pc = (0x0040 + 8 * irq_num) as u16;
+        self.mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));
+        true
     }
 
     pub fn process_input_event(&mut self, event: ButtonEvent) {
         self.mmu.joypad.receive_event(event);
     }
 
-    fn do_cycle(&mut self) -> usize {
+    fn do_cycle(&mut self) -> CpuStepResult {
         let current_address = self.registers.pc;
         let op_code = self.fetch_byte();
 
         //println!("do_cycle: {:#04X} @ {:#06X}", op_code, current_address);
 
-        match op_codes::execute(op_code, self) {
+        let cycles = match op_codes::execute(op_code, self) {
             OpCodeResult::Executed(ticks) => ticks,
             OpCodeResult::UnknownOpCode => {
                 println!(
@@ -142,6 +158,10 @@ impl Cpu {
                 self.halted = true;
                 4
             } //NOOP on unknown opcodes
+        };
+        CpuStepResult {
+            cycles,
+            opcode: Some(op_code),
         }
     }
 
@@ -261,5 +281,58 @@ mod tests {
         op_codes::execute(0x20, &mut cpu);
 
         assert_eq!(cpu.registers.pc, 0);
+    }
+
+    #[test]
+    fn highest_priority_interrupt_consumes_twenty_cycles_and_ticks_devices() {
+        let mut cpu = Cpu::new(Box::new(TestMbc));
+        cpu.registers.pc = 0x1234;
+        cpu.registers.sp = 0xFFFE;
+        cpu.ime = true;
+        cpu.mmu.write_byte(0xFFFF, 0b0000_0101);
+        cpu.mmu.write_byte(0xFF0F, 0b0000_0101);
+        cpu.mmu.write_byte(0xFF07, 0x05);
+
+        let result = cpu.tick();
+        assert_eq!(result.cycles, 20);
+        assert_eq!(result.opcode, None);
+        assert!(!cpu.ime);
+
+        // VBlank (bit 0) wins over the simultaneously pending timer interrupt (bit 2).
+        assert_eq!(cpu.registers.pc, 0x0040);
+        assert_eq!(cpu.registers.sp, 0xFFFC);
+        assert_eq!(cpu.mmu.read_word(0xFFFC), 0x1234);
+        assert_eq!(cpu.mmu.read_byte(0xFF0F), 0b0000_0100);
+
+        // Twenty T-cycles include the timer's first bit-3 falling edge at cycle 16.
+        assert_eq!(cpu.mmu.read_byte(0xFF05), 1);
+
+        // The handler's NOP runs on the next step, without servicing the pending timer IRQ.
+        let result = cpu.tick();
+        assert_eq!(result.cycles, 4);
+        assert_eq!(result.opcode, Some(0x00));
+        assert_eq!(cpu.registers.pc, 0x0041);
+        assert_eq!(cpu.registers.sp, 0xFFFC);
+    }
+
+    #[test]
+    fn halt_idle_reports_no_opcode_but_waking_execution_does() {
+        let mut cpu = Cpu::new(Box::new(TestMbc));
+        cpu.registers.pc = 0xC000;
+        cpu.mmu.write_byte(0xC000, 0x76); // HALT
+        cpu.mmu.write_byte(0xC001, 0x04); // INC B
+
+        assert_eq!(cpu.tick().opcode, Some(0x76));
+        let result = cpu.tick();
+        assert_eq!(result.cycles, 4);
+        assert_eq!(result.opcode, None);
+        assert_eq!(cpu.registers.pc, 0xC001);
+
+        cpu.mmu.write_byte(0xFFFF, 1);
+        cpu.mmu.write_byte(0xFF0F, 1);
+        let result = cpu.tick();
+        assert_eq!(result.cycles, 4);
+        assert_eq!(result.opcode, Some(0x04));
+        assert_eq!(cpu.registers.pc, 0xC002);
     }
 }

@@ -266,7 +266,7 @@ fn run_for_cycles(
 ) -> Result<(), String> {
     let mut elapsed = 0;
     while elapsed < cycles {
-        elapsed += step(emulator, hardware)?;
+        elapsed += step(emulator, hardware)?.0;
     }
     Ok(())
 }
@@ -279,8 +279,7 @@ fn run_until_opcode(
 ) -> Result<bool, String> {
     let mut elapsed = 0;
     while elapsed < max_cycles {
-        let executed_opcode = emulator.machine().next_opcode();
-        let ticks = step(emulator, hardware)?;
+        let (ticks, executed_opcode) = step(emulator, hardware)?;
         elapsed += ticks;
         if executed_opcode == Some(opcode) {
             return Ok(true);
@@ -289,7 +288,10 @@ fn run_until_opcode(
     Ok(false)
 }
 
-fn step(emulator: &mut Session, hardware: &mut TestHardware) -> Result<usize, String> {
+fn step(
+    emulator: &mut Session,
+    hardware: &mut TestHardware,
+) -> Result<(usize, Option<u8>), String> {
     let result = emulator.step();
     if let Some(frame) = result.frame {
         hardware.present_frame(frame)?;
@@ -297,5 +299,5 @@ fn step(emulator: &mut Session, hardware: &mut TestHardware) -> Result<usize, St
     for buffer in result.audio_buffers {
         hardware.queue_audio(buffer)?;
     }
-    Ok(result.cycles)
+    Ok((result.cycles, result.opcode))
 }
