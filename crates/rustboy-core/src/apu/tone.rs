@@ -11,12 +11,11 @@ pub struct Tone {
     enabled: bool,
     duty: usize,
     length_enabled: bool,
-    length: usize, //Sound Length = (64-t1)*(1/256) seconds
     duration: usize,
-    frequency: u16, //Frequency = 131072/(2048-x) Hz
+    frequency: u16,
     counter: usize,
-    phase: usize,  //which position in the waveform array
-    period: usize, //ticks per period
+    phase: usize,
+    period: usize,
     volume_envelope: VolumeEnvelope,
     sweep: Sweep,
 }
@@ -27,7 +26,6 @@ impl Tone {
             enabled: false,
             duty: 2,
             length_enabled: false,
-            length: 0,
             duration: 0,
             frequency: 2048,
             counter: 0,
@@ -57,14 +55,15 @@ impl Tone {
         match address {
             0xFF10 => self.sweep.write_byte(value),
             0xFF11 | 0xFF16 => {
-                self.length = 64 - (value & 0b0011_1111) as usize;
+                // The register stores a complement: zero means the longest 64-step sound and
+                // 63 means one length-clock step. Writing it loads the length counter.
+                self.duration = 64 - (value & 0b0011_1111) as usize;
                 self.duty = ((value & 0b1100_0000) >> 6) as usize;
             }
             0xFF12 | 0xFF17 => self.volume_envelope.write_byte(value),
             0xFF13 | 0xFF18 => {
                 self.frequency = (self.frequency & 0xFF00) | value as u16;
                 self.update_period();
-                self.duration = self.length;
             }
             0xFF14 | 0xFF19 => {
                 self.frequency = (self.frequency & 0x00FF) | (((value & 0b0000_0111) as u16) << 8);
@@ -72,8 +71,12 @@ impl Tone {
                 self.length_enabled = value & 0b0100_0000 == 0b0100_0000;
 
                 if value & 0b1000_0000 == 0b1000_0000 {
+                    // A trigger only reloads an expired length counter. Retriggering an active
+                    // channel preserves its remaining duration, as on the hardware.
+                    if self.duration == 0 {
+                        self.duration = 64;
+                    }
                     self.enabled = true;
-                    self.duration = self.length;
                     self.volume_envelope.reset();
                 }
             }
@@ -161,7 +164,6 @@ impl Sweep {
             if self.counter >= self.period {
                 let offset = frequency >> self.shift;
                 let new_frequency = if self.subtraction {
-                    //X(t) = X(t-1) +/- X(t-1)/2^n
                     frequency - offset
                 } else {
                     frequency + offset
@@ -175,5 +177,31 @@ impl Sweep {
             }
         }
         frequency
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Tone;
+
+    #[test]
+    fn triggering_an_empty_tone_counter_reloads_its_maximum_length() {
+        let mut tone = Tone::new();
+        tone.write_byte(0xFF14, 0b1100_0000);
+
+        tone.timer_step();
+
+        assert!(tone.is_enabled());
+        assert_eq!(tone.duration, 63);
+    }
+
+    #[test]
+    fn tone_length_register_sets_the_complementary_duration() {
+        let mut tone = Tone::new();
+        tone.write_byte(0xFF11, 0);
+        assert_eq!(tone.duration, 64);
+
+        tone.write_byte(0xFF11, 0b0011_1111);
+        assert_eq!(tone.duration, 1);
     }
 }

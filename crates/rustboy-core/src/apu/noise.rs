@@ -6,7 +6,7 @@ pub struct Noise {
     period: usize,
     lfsr: u16,   //gameboy has a 15bit lfsr - 16bit is good enough :)
     short: bool, //gameboy has 15bit/7bit - 16/8 for us
-    length: u16,
+    length_data: u8,
     duration: u16,
     length_enabled: bool,
     volume_envelope: VolumeEnvelope,
@@ -20,7 +20,7 @@ impl Noise {
             period: 1,
             lfsr: 0x7FFF,
             short: false,
-            length: 0,
+            length_data: 0,
             duration: 0,
             length_enabled: false,
             volume_envelope: VolumeEnvelope::new(),
@@ -33,7 +33,7 @@ impl Noise {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0xFF20 => self.length as u8,
+            0xFF20 => self.length_data,
             0xFF21 => self.volume_envelope.read_byte(),
             _ => 0,
         }
@@ -41,7 +41,12 @@ impl Noise {
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
         match address {
-            0xFF20 => self.length = (value & 0b0001_1111) as u16,
+            0xFF20 => {
+                // NR41 has six length bits. Like the square channels, it stores the complement
+                // of the effective 64-step length counter.
+                self.length_data = value & 0b0011_1111;
+                self.duration = 64 - self.length_data as u16;
+            }
             0xFF21 => self.volume_envelope.write_byte(value),
             0xFF22 => {
                 self.short = value & 0b0000_1000 == 0b0000_1000;
@@ -55,8 +60,12 @@ impl Noise {
                 self.length_enabled = value & 0b0100_0000 == 0b0100_0000;
 
                 if value & 0b1000_0000 == 0b1000_0000 {
+                    // Triggering an expired noise channel reloads its maximum length. An active
+                    // counter is not restarted merely because the channel is retriggered.
+                    if self.duration == 0 {
+                        self.duration = 64;
+                    }
                     self.enabled = true;
-                    self.duration = self.length;
                     self.volume_envelope.reset();
                 }
             }
@@ -99,5 +108,31 @@ impl Noise {
 
     pub fn envelope_step(&mut self) {
         self.volume_envelope.step();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Noise;
+
+    #[test]
+    fn noise_length_register_uses_all_six_bits() {
+        let mut noise = Noise::new();
+        noise.write_byte(0xFF20, 0);
+        assert_eq!(noise.duration, 64);
+
+        noise.write_byte(0xFF20, 0b0011_1111);
+        assert_eq!(noise.duration, 1);
+    }
+
+    #[test]
+    fn triggering_an_empty_noise_counter_reloads_its_maximum_length() {
+        let mut noise = Noise::new();
+        noise.write_byte(0xFF23, 0b1100_0000);
+
+        noise.timer_step();
+
+        assert!(noise.is_enabled());
+        assert_eq!(noise.duration, 63);
     }
 }

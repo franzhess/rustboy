@@ -1,6 +1,5 @@
 pub struct Wave {
     enabled: bool,
-    length: usize,
     duration: usize,
     volume: usize, //shift right
     frequency: u16,
@@ -15,7 +14,6 @@ impl Wave {
     pub fn new() -> Wave {
         Wave {
             enabled: false,
-            length: 0,
             duration: 0,
             wave_pattern: [0; 32],
             volume: 0,
@@ -38,12 +36,14 @@ impl Wave {
     pub fn write_byte(&mut self, address: u16, value: u8) {
         match address {
             0xFF1A => self.enabled = value & 0b1000_0000 == 0b1000_0000,
-            0xFF1B => self.length = value as usize,
+            0xFF1B => {
+                // NR31 is an eight-bit complement, so zero loads the maximum 256-step length.
+                self.duration = 256 - value as usize;
+            }
             0xFF1C => self.volume = ((value & 0b0110_0000) as usize) >> 5,
             0xFF1D => {
                 self.frequency = (self.frequency & 0xFF00) | value as u16;
                 self.update_period();
-                self.duration = self.length;
             }
             0xFF1E => {
                 self.frequency = (self.frequency & 0x00FF) | (((value & 0b0000_0111) as u16) << 8);
@@ -51,8 +51,12 @@ impl Wave {
                 self.length_enabled = value & 0b0100_0000 == 0b0100_0000;
 
                 if value & 0b1000_0000 == 0b1000_0000 {
+                    // An empty counter is reloaded on trigger; retriggering an active channel
+                    // leaves its currently programmed remaining duration intact.
+                    if self.duration == 0 {
+                        self.duration = 256;
+                    }
                     self.enabled = true;
-                    self.duration = self.length;
                 }
             }
             0xFF30..=0xFF3F => {
@@ -98,5 +102,31 @@ impl Wave {
         } else {
             (2048 - frequency as usize) * 2
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Wave;
+
+    #[test]
+    fn wave_length_register_uses_all_eight_bits() {
+        let mut wave = Wave::new();
+        wave.write_byte(0xFF1B, 0);
+        assert_eq!(wave.duration, 256);
+
+        wave.write_byte(0xFF1B, 0xFF);
+        assert_eq!(wave.duration, 1);
+    }
+
+    #[test]
+    fn triggering_an_empty_wave_counter_reloads_its_maximum_length() {
+        let mut wave = Wave::new();
+        wave.write_byte(0xFF1E, 0b1100_0000);
+
+        wave.timer_step();
+
+        assert!(wave.is_enabled());
+        assert_eq!(wave.duration, 255);
     }
 }
