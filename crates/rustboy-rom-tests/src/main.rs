@@ -158,6 +158,25 @@ fn panic_message(panic: Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+fn cycle_budget(suite: &str, name: &str, exit: &ExitCondition) -> usize {
+    let mut seconds = exit.time.unwrap_or(5.0);
+    // Exhaustive MBC register sweeps outlast the upstream metadata's short limits.
+    // Only extend opcode-based deadlines: time-only exits specify when to assert.
+    if exit.opcode.is_some()
+        && suite == "mooneye-test-suite"
+        && [
+            "emulator-only/mbc1/",
+            "emulator-only/mbc2/",
+            "emulator-only/mbc5/",
+        ]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
+        seconds = seconds.max(30.0);
+    }
+    (seconds * CPU_FREQUENCY as f64) as usize
+}
+
 fn run_test(root: &Path, suite: &str, test: &RomTest) -> Outcome {
     let Some(success) = &test.success else {
         return Outcome::Skipped("no machine-readable success assertion".to_owned());
@@ -174,7 +193,7 @@ fn run_test(root: &Path, suite: &str, test: &RomTest) -> Outcome {
     };
     let mut emulator = Session::new(Machine::new(rom));
     let mut hardware = TestHardware;
-    let max_cycles = (test.exit.time.unwrap_or(5.0) * CPU_FREQUENCY as f64) as usize;
+    let max_cycles = cycle_budget(suite, &test.name, &test.exit);
     if let Some(opcode) = test.exit.opcode {
         match run_until_opcode(&mut emulator, &mut hardware, opcode, max_cycles) {
             Ok(true) => (),
@@ -300,4 +319,57 @@ fn step(
         hardware.queue_audio(buffer)?;
     }
     Ok((result.cycles, result.opcode))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cycle_budget, ExitCondition, CPU_FREQUENCY};
+
+    #[test]
+    fn mbc_opcode_deadlines_have_a_thirty_second_floor() {
+        for name in [
+            "emulator-only/mbc1/bits_ramg",
+            "emulator-only/mbc2/bits_unused",
+            "emulator-only/mbc5/rom_64Mb",
+        ] {
+            for time in [None, Some(2.0), Some(30.0), Some(60.0)] {
+                let exit = ExitCondition {
+                    opcode: Some(0x40),
+                    time,
+                };
+                let expected_seconds = if time == Some(60.0) { 60 } else { 30 };
+                assert_eq!(
+                    cycle_budget("mooneye-test-suite", name, &exit),
+                    expected_seconds * CPU_FREQUENCY
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn time_only_exits_keep_their_exact_assertion_time() {
+        for (time, seconds) in [(Some(2.0), 2), (None, 5)] {
+            let exit = ExitCondition { opcode: None, time };
+            assert_eq!(
+                cycle_budget("mooneye-test-suite", "emulator-only/mbc1/ram_64kb", &exit),
+                seconds * CPU_FREQUENCY
+            );
+        }
+    }
+
+    #[test]
+    fn other_suites_and_mooneye_groups_keep_their_deadlines() {
+        for (suite, name) in [
+            ("gbmicrotest", "emulator-only/mbc1/example"),
+            ("mooneye-test-suite", "acceptance/jp_timing"),
+        ] {
+            for (time, seconds) in [(Some(2.0), 2), (None, 5)] {
+                let exit = ExitCondition {
+                    opcode: Some(0x40),
+                    time,
+                };
+                assert_eq!(cycle_budget(suite, name, &exit), seconds * CPU_FREQUENCY);
+            }
+        }
+    }
 }

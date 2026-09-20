@@ -1,5 +1,19 @@
 # ROM conformance baseline
 
+## MBC ROM time allowance — 2026-09-20
+
+The runner now gives opcode-based Mooneye `emulator-only/mbc1`, `mbc2`, and `mbc5` tests
+a minimum budget of 30 emulated seconds. Longer metadata limits are preserved. Other
+groups and time-only assertions keep their original metadata timing or five-second default.
+Three runner unit tests cover these boundaries; all 52 workspace unit tests pass on `main`.
+
+A temporary worktree combined the opcode-duration corrections, this allowance, and all five
+MBC fix commits (`2a0f865`, `52a91a5`, `0b94e44`, `89413ca`, `7d50a55`). `cargo rom-tests -- mbc`
+then reported **30 passed, 1 failed**. All seven former MBC register-sweep timeouts passed.
+The remaining failure is the unsupported MBC3 RTC cartridge type `0x10`. The MBC fixes still
+live on their indexed review branches; this result describes the combined verification,
+not the mapper implementation currently on `main`.
+
 ## Opcode-duration audit — 2026-09-20
 
 The CPU timing regression tests cover all 244 legal unprefixed instructions and all 256
