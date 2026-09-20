@@ -52,13 +52,13 @@ impl Mbc for Mbc1 {
                 .copied()
                 .unwrap_or(0xFF)
         } else {
-            0
+            0xFF
         }
     }
 
     fn write_rom(&mut self, address: u16, value: u8) {
         match address {
-            0x0000..=0x1FFF => self.ram_enabled = value == 0x0A,
+            0x0000..=0x1FFF => self.ram_enabled = value & 0x0F == 0x0A,
             0x2000..=0x3FFF => {
                 self.selected_rom_bank = (self.selected_rom_bank & 0x60)
                     | match value as usize & 0x1F {
@@ -73,7 +73,7 @@ impl Mbc for Mbc1 {
                 }
                 BankingMode::Ram => self.selected_ram_bank = (value as usize) & 0x03,
             },
-            0x6000..=0x7FFF => match value {
+            0x6000..=0x7FFF => match value & 1 {
                 0 => self.banking_mode = BankingMode::Rom,
                 _ => self.banking_mode = BankingMode::Ram,
             },
@@ -89,6 +89,44 @@ impl Mbc for Mbc1 {
             {
                 *cell = value;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ram_enable_uses_only_the_low_nibble() {
+        let mut mbc = Mbc1::new(vec![0; ROM_BANK_SIZE * 2]);
+        for value in 0..=u8::MAX {
+            mbc.write_rom(0x0000, value);
+            assert_eq!(mbc.read_ram(0), if value & 0x0F == 0x0A { 0 } else { 0xFF });
+            mbc.write_ram(0, value);
+            mbc.write_rom(0x0000, 0x0A);
+            assert_eq!(
+                mbc.read_ram(0),
+                if value & 0x0F == 0x0A { value } else { 0 }
+            );
+            mbc.write_ram(0, 0);
+        }
+    }
+
+    #[test]
+    fn banking_mode_uses_only_bit_zero() {
+        let mut mbc = Mbc1::new(vec![0; ROM_BANK_SIZE * 2]);
+        mbc.write_rom(0x0000, 0x0A);
+        mbc.write_rom(0x6000, 1);
+        mbc.write_rom(0x4000, 1);
+        mbc.write_ram(0, 0x55);
+        mbc.write_rom(0x4000, 0);
+        for value in 0..=u8::MAX {
+            mbc.write_rom(0x6000, value);
+            mbc.write_rom(0x4000, 1);
+            assert_eq!(mbc.read_ram(0), if value & 1 == 1 { 0x55 } else { 0 });
+            mbc.write_rom(0x6000, 1);
+            mbc.write_rom(0x4000, 0);
         }
     }
 }
