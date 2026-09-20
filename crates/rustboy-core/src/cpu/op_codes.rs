@@ -154,7 +154,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //LD HL,nn
         0x22 => {
             cpu.mmu.write_byte(cpu.registers.get_hli(), cpu.registers.a);
-            Executed(12)
+            Executed(8)
         } //LD (HL+),A
         0x23 => {
             cpu.registers.set_hl(cpu.registers.get_hl().wrapping_add(1));
@@ -559,7 +559,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //ADD A,L
         0x86 => {
             cpu.execute_binary_with_value(alu::add, cpu.mmu.read_byte(cpu.registers.get_hl()));
-            Executed(4)
+            Executed(8)
         } //ADD A,(HL)
         0x87 => {
             cpu.execute_binary(alu::add, RegisterName8::A);
@@ -623,7 +623,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //SUB A,L
         0x96 => {
             cpu.execute_binary_with_value(alu::sub, cpu.mmu.read_byte(cpu.registers.get_hl()));
-            Executed(4)
+            Executed(8)
         } //SUB A,(HL)
         0x97 => {
             cpu.execute_binary(alu::sub, RegisterName8::A);
@@ -783,7 +783,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //CP L
         0xBE => {
             cpu.execute_binary_with_value(alu::cp, cpu.mmu.read_byte(cpu.registers.get_hl()));
-            Executed(4)
+            Executed(8)
         } //CP (HL)
         0xBF => {
             cpu.execute_binary(alu::cp, RegisterName8::A);
@@ -813,7 +813,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //JP NZ,nn
         0xC3 => {
             cpu.registers.pc = cpu.fetch_word();
-            Executed(12)
+            Executed(16)
         } //JUMP nn
         0xC4 => {
             if !cpu.registers.get_flag(CpuFlag::Z) {

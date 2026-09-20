@@ -67,9 +67,11 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   but changes `gbmicrotest/halt_bug` from passing to failing. That test sums timer reads:
   it now reports `0x16` instead of `0x14`. The old path incorrectly executed the post-HALT
   INC only once; the corrected path executes it twice. Investigate the remaining timing
-  mismatch rather than removing fetch suppression. Existing opcode timing errors observed
-  in its trace include JP a16 taking 12 instead of 16 T-cycles and ADD A,(HL) taking 4 instead
-  of 8 T-cycles.
+  mismatch rather than removing fetch suppression. The opcode-duration audit corrected
+  JP a16 to 16 T-cycles and ADD A,(HL) to 8, plus LD (HL+),A, SUB/CP (HL), and all CB (HL)
+  durations. `gbmicrotest/halt_bug` still fails and `acceptance/jp_timing` still times out.
+  All legal base and CB opcode durations are covered by unit tests across all flag combinations;
+  this verifies instruction totals, not the ordering of bus operations within an instruction.
 
 ## Testing
 

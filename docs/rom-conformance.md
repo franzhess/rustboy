@@ -1,5 +1,21 @@
 # ROM conformance baseline
 
+## Opcode-duration audit — 2026-09-20
+
+The CPU timing regression tests cover all 244 legal unprefixed instructions and all 256
+CB-prefixed instructions through `Cpu::tick`, with all 16 flag combinations. Conditional
+JR/JP/CALL/RET instructions exercise both outcomes. The 11 illegal unprefixed opcodes are
+checked as unsupported rather than assigned an instruction duration. Two additional tests
+check that JP a16 and ADD A,(HL) advance the timer by their corrected durations.
+
+The audit corrected five base opcodes (`22`, `86`, `96`, `BE`, `C3`) and all 32 CB-prefixed
+`(HL)` operations: BIT takes 12 T-cycles, while read/modify/write operations take 16.
+These are instruction-total corrections; CPU M-cycle bus scheduling remains future work.
+
+Formatting, Clippy, and all 49 workspace unit tests pass. Focused ROM checks retain 11/13
+timer passes and passes for `intr_timing` and `reti_intr_timing`. `acceptance/jp_timing`
+still times out and `gbmicrotest/halt_bug` still fails its memory assertion.
+
 ## After review-branch integration — 2026-09-18
 
 - Rustboy: `9a73680` (`fix: emulate EI and HALT timing`)

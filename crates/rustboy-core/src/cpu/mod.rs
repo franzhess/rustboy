@@ -3,6 +3,9 @@ mod op_codes;
 mod op_codes_cb;
 mod registers;
 
+#[cfg(test)]
+mod timing_tests;
+
 use crate::cpu::registers::{FlagRegister, RegisterName16, RegisterName8, Registers};
 use crate::mbc::Mbc;
 use crate::mmu::Mmu;
@@ -277,7 +280,7 @@ mod tests {
         fn write_ram(&mut self, _address: u16, _value: u8) {}
     }
 
-    fn cpu_with_program(program: &[u8]) -> Cpu {
+    pub(super) fn cpu_with_program(program: &[u8]) -> Cpu {
         let mut rom = vec![0; 0x100 + program.len()];
         rom[0x100..].copy_from_slice(program);
         rom[0x40] = 0x04; // VBlank handler: INC B; RETI
@@ -291,6 +294,35 @@ mod tests {
         let result = cpu.tick();
         assert_eq!(result.cycles, cycles);
         assert_eq!(result.opcode, opcode);
+    }
+
+    #[test]
+    fn absolute_jump_consumes_sixteen_cycles_and_advances_the_timer() {
+        let mut cpu = cpu_with_program(&[0xC3, 0x34, 0x12]);
+        cpu.mmu.write_byte(0xFF04, 0);
+        cpu.mmu.write_byte(0xFF07, 0x05);
+
+        assert_step(&mut cpu, 16, Some(0xC3));
+        assert_eq!(cpu.registers.pc, 0x1234);
+        assert_eq!(cpu.mmu.read_byte(0xFF05), 1);
+    }
+
+    #[test]
+    fn add_indirect_hl_consumes_eight_cycles_per_memory_operand() {
+        let mut cpu = cpu_with_program(&[0x86, 0x86]);
+        cpu.registers.a = 1;
+        cpu.registers.set_hl(0xC000);
+        cpu.mmu.write_byte(0xC000, 2);
+        cpu.mmu.write_byte(0xFF04, 0);
+        cpu.mmu.write_byte(0xFF07, 0x05);
+
+        assert_step(&mut cpu, 8, Some(0x86));
+        assert_eq!(cpu.registers.a, 3);
+        assert_eq!(cpu.mmu.read_byte(0xFF05), 0);
+        assert_step(&mut cpu, 8, Some(0x86));
+        assert_eq!(cpu.registers.a, 5);
+        assert_eq!(cpu.registers.pc, 0x102);
+        assert_eq!(cpu.mmu.read_byte(0xFF05), 1);
     }
 
     #[test]

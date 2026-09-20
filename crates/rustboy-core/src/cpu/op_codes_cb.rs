@@ -33,7 +33,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RLC L
         0x06 => {
             cpu.execute_hl(alu::rlc);
-            Executed(8)
+            Executed(16)
         } //RLC (HL)
         0x07 => {
             cpu.execute(alu::rlc, RegisterName8::A);
@@ -65,7 +65,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RRC L
         0x0E => {
             cpu.execute_hl(alu::rrc);
-            Executed(8)
+            Executed(16)
         } //RRC (HL)
         0x0F => {
             cpu.execute(alu::rrc, RegisterName8::A);
@@ -97,7 +97,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RL L
         0x16 => {
             cpu.execute_hl(alu::rl);
-            Executed(8)
+            Executed(16)
         } //RL (HL)
         0x17 => {
             cpu.execute(alu::rl, RegisterName8::A);
@@ -129,7 +129,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RR L
         0x1E => {
             cpu.execute_hl(alu::rr);
-            Executed(8)
+            Executed(16)
         } //RR (HL)
         0x1F => {
             cpu.execute(alu::rr, RegisterName8::A);
@@ -161,7 +161,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //SLA L
         0x26 => {
             cpu.execute_hl(alu::sla);
-            Executed(8)
+            Executed(16)
         } //SLA (HL)
         0x27 => {
             cpu.execute(alu::sla, RegisterName8::A);
@@ -193,7 +193,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //SRA L
         0x2E => {
             cpu.execute_hl(alu::sra);
-            Executed(8)
+            Executed(16)
         } //SRA (HL)
         0x2F => {
             cpu.execute(alu::sra, RegisterName8::A);
@@ -225,7 +225,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //SWAP L
         0x36 => {
             cpu.execute_hl(alu::swap);
-            Executed(8)
+            Executed(16)
         } //SWAP (HL)
         0x37 => {
             cpu.execute(alu::swap, RegisterName8::A);
@@ -257,7 +257,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //SRL L
         0x3E => {
             cpu.execute_hl(alu::srl);
-            Executed(8)
+            Executed(16)
         } //SRL (HL)
         0x3F => {
             cpu.execute(alu::srl, RegisterName8::A);
@@ -296,7 +296,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x46 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 0, value);
-            Executed(8)
+            Executed(12)
         } //BIT 0,(HL)
         0x47 => {
             let value = cpu.registers.a;
@@ -336,7 +336,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x4E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 1, value);
-            Executed(8)
+            Executed(12)
         } //BIT 1,(HL)
         0x4F => {
             let value = cpu.registers.a;
@@ -376,7 +376,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x56 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 2, value);
-            Executed(8)
+            Executed(12)
         } //BIT 2,(HL)
         0x57 => {
             let value = cpu.registers.a;
@@ -416,7 +416,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x5E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 3, value);
-            Executed(8)
+            Executed(12)
         } //BIT 3,(HL)
         0x5F => {
             let value = cpu.registers.a;
@@ -456,7 +456,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x66 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 4, value);
-            Executed(8)
+            Executed(12)
         } //BIT 4,(HL)
         0x67 => {
             let value = cpu.registers.a;
@@ -496,7 +496,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x6E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 5, value);
-            Executed(8)
+            Executed(12)
         } //BIT 5,(HL)
         0x6F => {
             let value = cpu.registers.a;
@@ -536,7 +536,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x76 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 6, value);
-            Executed(8)
+            Executed(12)
         } //BIT 6,(HL)
         0x77 => {
             let value = cpu.registers.a;
@@ -576,7 +576,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x7E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
             alu::bit(&mut cpu.registers, 7, value);
-            Executed(8)
+            Executed(12)
         } //BIT 7,(HL)
         0x7F => {
             let value = cpu.registers.a;
@@ -610,7 +610,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x86 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0000_0001;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 0,(HL)
         0x87 => {
             cpu.registers.a &= !0b0000_0001;
@@ -643,7 +643,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x8E => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0000_0010;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 1,(HL)
         0x8F => {
             cpu.registers.a &= !0b0000_0010;
@@ -676,7 +676,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x96 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0000_0100;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 2,(HL)
         0x97 => {
             cpu.registers.a &= !0b0000_0100;
@@ -709,7 +709,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0x9E => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0000_1000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 3,(HL)
         0x9F => {
             cpu.registers.a &= !0b0000_1000;
@@ -742,7 +742,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xA6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0001_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 4,(HL)
         0xA7 => {
             cpu.registers.a &= !0b0001_0000;
@@ -775,7 +775,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xAE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0010_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 5,(HL)
         0xAF => {
             cpu.registers.a &= !0b0010_0000;
@@ -808,7 +808,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xB6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b0100_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 6,(HL)
         0xB7 => {
             cpu.registers.a &= !0b0100_0000;
@@ -841,7 +841,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xBE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) & !0b1000_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //RES 7,(HL)
         0xBF => {
             cpu.registers.a &= !0b1000_0000;
@@ -874,7 +874,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xC6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0000_0001;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 0,(HL)
         0xC7 => {
             cpu.registers.a |= 0b0000_0001;
@@ -907,7 +907,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xCE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0000_0010;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 1,(HL)
         0xCF => {
             cpu.registers.a |= 0b0000_0010;
@@ -940,7 +940,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xD6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0000_0100;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 2,(HL)
         0xD7 => {
             cpu.registers.a |= 0b0000_0100;
@@ -973,7 +973,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xDE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0000_1000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 3,(HL)
         0xDF => {
             cpu.registers.a |= 0b0000_1000;
@@ -1006,7 +1006,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xE6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0001_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 4,(HL)
         0xE7 => {
             cpu.registers.a |= 0b0001_0000;
@@ -1039,7 +1039,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xEE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0010_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 5,(HL)
         0xEF => {
             cpu.registers.a |= 0b0010_0000;
@@ -1072,7 +1072,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xF6 => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b0100_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 6,(HL)
         0xF7 => {
             cpu.registers.a |= 0b0100_0000;
@@ -1105,7 +1105,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         0xFE => {
             let new_value = cpu.mmu.read_byte(cpu.registers.get_hl()) | 0b1000_0000;
             cpu.mmu.write_byte(cpu.registers.get_hl(), new_value);
-            Executed(8)
+            Executed(16)
         } //SET 7,(HL)
         0xFF => {
             cpu.registers.a |= 0b1000_0000;
