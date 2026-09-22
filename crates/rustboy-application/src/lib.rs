@@ -17,7 +17,10 @@ pub trait InputSource {
 }
 
 pub trait RomSource {
-    fn load_cartridge(&self) -> Result<Cartridge, String>;
+    /// The adapter's structured error, including any underlying cause.
+    type Error: std::error::Error;
+
+    fn load_cartridge(&self) -> Result<Cartridge, Self::Error>;
 }
 
 pub trait Platform: InputSource + FrameSink + AudioSink {}

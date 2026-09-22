@@ -75,8 +75,10 @@ impl FileRomSource {
 }
 
 impl rustboy_application::RomSource for FileRomSource {
-    fn load_cartridge(&self) -> Result<Cartridge, String> {
-        load_rom(&self.path).map_err(|error| error.to_string())
+    type Error = LoadError;
+
+    fn load_cartridge(&self) -> Result<Cartridge, Self::Error> {
+        load_rom(&self.path)
     }
 }
 
@@ -109,9 +111,34 @@ fn extract_rom(bytes: Vec<u8>) -> Result<Vec<u8>, LoadError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{io, LoadError, RomLoadError};
+    use super::{io, FileRomSource, LoadError, RomLoadError};
+    use rustboy_application::RomSource;
     use std::error::Error;
+    use std::path::Path;
     use zip::result::ZipError;
+
+    #[test]
+    fn rom_source_port_preserves_typed_io_errors_and_their_causes() {
+        // A checked-in regular file cannot contain a child ROM. This triggers a
+        // real I/O failure without temporary files or assumptions about permissions.
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("Cargo.toml")
+            .join("rom.gb");
+        let source = FileRomSource::new(path);
+        let port: &dyn RomSource<Error = LoadError> = &source;
+        let error = port.load_cartridge().err().expect("invalid ROM path");
+
+        let LoadError::Io(io_error) = &error else {
+            panic!("expected typed I/O failure, got {error:?}");
+        };
+        let cause = error
+            .source()
+            .expect("I/O cause")
+            .downcast_ref::<io::Error>()
+            .expect("original I/O error type");
+        assert_eq!(cause.kind(), io_error.kind());
+        assert_eq!(error.to_string(), io_error.to_string());
+    }
 
     #[test]
     fn io_source_preserves_error_kind_and_message() {

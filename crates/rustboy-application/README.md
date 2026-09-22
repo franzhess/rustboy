@@ -15,7 +15,11 @@ Ports are small traits defined by the application and implemented by adapters:
 - `InputSource` supplies Game Boy button events and a quit decision.
 - `FrameSink` receives completed 160 by 144 pixel frames.
 - `AudioSink` receives generated stereo sample buffers.
-- `RomSource` creates a core `Cartridge` from an external source.
+- `RomSource` creates a core `Cartridge` from an external source, returning
+  `Result<Cartridge, Self::Error>`. Each adapter supplies an associated `Error`
+  type implementing `std::error::Error`, preserving structured failures and their
+  causes through the port. Generic consumers can propagate `S::Error` for a source
+  `S: RomSource`; trait objects specify `dyn RomSource<Error = E>`.
 
 SDL3 implements the input, frame, and audio ports. The ROM test runner uses no-op frame and audio sinks because it only needs machine state assertions. Keeping these ports separate avoids a single frontend interface that must know about every possible input, display, audio, and testing concern.
 
