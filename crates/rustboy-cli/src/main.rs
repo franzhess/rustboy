@@ -22,7 +22,9 @@ fn main() {
             std::process::exit(1);
         });
     let mut session = Session::new(Machine::new(cartridge));
-    if let Err(error) = adapter.play().and_then(|_| run(&mut adapter, &mut session)) {
+    if let Err(error) = adapter.play() {
+        eprintln!("Could not start audio: {error}");
+    } else if let Err(error) = run(&mut adapter, &mut session) {
         eprintln!("Emulator stopped: {error}");
     }
     if let Err(error) = adapter.stop() {

@@ -26,7 +26,7 @@ const GAMEPAD_BUTTONS: [(GamepadButton, Button); 8] = [
 ];
 
 impl Input {
-    pub fn new(sdl: &Sdl) -> Result<Self, String> {
+    pub fn new(sdl: &Sdl) -> Result<Self, sdl3::Error> {
         let gamepad_subsystem = match sdl.gamepad() {
             Ok(subsystem) => Some(subsystem),
             Err(error) => {
@@ -35,7 +35,7 @@ impl Input {
             }
         };
         let mut input = Self {
-            event_pump: sdl.event_pump().map_err(|error| error.to_string())?,
+            event_pump: sdl.event_pump()?,
             gamepad_subsystem,
             gamepad: None,
             buttons: Buttons::default(),

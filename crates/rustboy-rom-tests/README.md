@@ -28,4 +28,9 @@ The runner provides a small test implementation of the application frame and aud
 
 ## Scope
 
+The no-op frame and audio sinks use `Infallible` as their associated error type.
+The stepping helpers propagate that type; output delivery cannot produce a runner
+failure. ROM loading errors, assertion failures, timeouts and captured core panics
+remain separate outcomes.
+
 Only eligible DMG tests with machine-readable memory or register expectations are registered. CGB/SGB, screenshot-only, and unsupported cartridge tests remain outside current emulator support. A failing ROM is useful evidence of a missing or inaccurate hardware behavior and is a natural starting point for the future debugger.

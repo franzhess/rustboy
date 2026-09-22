@@ -14,6 +14,21 @@
 
 SDL3 development libraries must be available to build this crate. See the workspace README for platform installation guidance.
 
+## Errors
+
+`Sdl3Adapter::new` returns `InitError`, distinguishing SDL setup, window creation,
+and logical-size configuration failures. It implements `std::error::Error` and
+exposes the original SDL error through `source()`.
+
+Frame presentation, audio queuing, and the `play`/`stop` methods return concrete
+`sdl3::Error` values. Input polling uses `Infallible`: the event pump is created
+during initialization, and polling itself has no fallible result. Optional gamepad
+failures retain the keyboard fallback described below.
+
+The application wraps runtime port failures in `RunError::Frame`, `RunError::Audio`,
+or `RunError::Input`, retaining their causes. No propagated SDL failure is converted
+to a string in this adapter.
+
 ## Controllers
 
 The adapter automatically opens the first available SDL-recognized gamepad at startup.

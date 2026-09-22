@@ -16,3 +16,8 @@ ROM-loading failures reach the CLI as `rustboy_adapter_rom::LoadError` through
 the `RomSource` port. The CLI formats them with the `Could not load ROM:` context
 and exits with status 1 before initializing SDL. The typed error and its source
 chain remain available until that presentation boundary.
+
+Platform initialization failures retain their typed SDL causes. Audio startup and
+shutdown failures are reported with `Could not start audio:` and `Could not stop
+audio:` respectively. Runtime failures are reported as `Emulator stopped:` followed
+by the application's input/frame/audio operation context and underlying error.

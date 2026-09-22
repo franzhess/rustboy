@@ -1,3 +1,4 @@
+use crate::InitError;
 use ::sdl3::pixels::Color;
 use ::sdl3::rect::Point;
 use ::sdl3::render::WindowCanvas;
@@ -10,13 +11,13 @@ pub struct Display {
 }
 
 impl Display {
-    pub fn new(sdl: &Sdl, width: u32, height: u32) -> Result<Self, String> {
-        let video = sdl.video().map_err(|error| error.to_string())?;
+    pub fn new(sdl: &Sdl, width: u32, height: u32) -> Result<Self, InitError> {
+        let video = sdl.video()?;
         let window = video
             .window("rustboy", width, height)
             .position_centered()
             .build()
-            .map_err(|error| error.to_string())?;
+            .map_err(InitError::Window)?;
         let mut canvas = window.into_canvas();
         canvas
             .set_logical_size(
@@ -24,24 +25,22 @@ impl Display {
                 SCREEN_HEIGHT as u32,
                 SDL_LOGICAL_PRESENTATION_INTEGER_SCALE,
             )
-            .map_err(|error| error.to_string())?;
+            .map_err(InitError::LogicalSize)?;
         canvas.set_draw_color(Color::RGB(0x08, 0x18, 0x20));
         canvas.clear();
         canvas.present();
         Ok(Self { canvas })
     }
 
-    pub fn draw_screen(&mut self, screen_buffer: Vec<u8>) -> Result<(), String> {
+    pub fn draw_screen(&mut self, screen_buffer: Vec<u8>) -> Result<(), sdl3::Error> {
         self.canvas.set_draw_color(Color::RGB(0x08, 0x18, 0x20));
         self.canvas.clear();
         for (i, pixel) in screen_buffer.iter().enumerate() {
             self.canvas.set_draw_color(map_color(*pixel));
-            self.canvas
-                .draw_point(Point::new(
-                    (i % SCREEN_WIDTH) as i32,
-                    (i / SCREEN_WIDTH) as i32,
-                ))
-                .map_err(|error| error.to_string())?;
+            self.canvas.draw_point(Point::new(
+                (i % SCREEN_WIDTH) as i32,
+                (i / SCREEN_WIDTH) as i32,
+            ))?;
         }
         self.canvas.present();
         Ok(())

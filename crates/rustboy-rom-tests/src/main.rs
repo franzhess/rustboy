@@ -62,13 +62,17 @@ enum Outcome {
 struct TestHardware;
 
 impl FrameSink for TestHardware {
-    fn present_frame(&mut self, _screen_buffer: Vec<u8>) -> Result<(), String> {
+    type Error = std::convert::Infallible;
+
+    fn present_frame(&mut self, _screen_buffer: Vec<u8>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 impl AudioSink for TestHardware {
-    fn queue_audio(&mut self, _sound_buffer: Vec<i16>) -> Result<(), String> {
+    type Error = std::convert::Infallible;
+
+    fn queue_audio(&mut self, _sound_buffer: Vec<i16>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -200,11 +204,11 @@ fn run_test(root: &Path, suite: &str, test: &RomTest) -> Outcome {
             Ok(false) => {
                 return Outcome::Failed(format!("did not execute exit opcode {opcode:#04X}"));
             }
-            Err(error) => return Outcome::Failed(error),
+            Err(never) => match never {},
         }
     } else {
-        if let Err(error) = run_for_cycles(&mut emulator, &mut hardware, max_cycles) {
-            return Outcome::Failed(error);
+        if let Err(never) = run_for_cycles(&mut emulator, &mut hardware, max_cycles) {
+            match never {}
         }
     }
     if let Some(memory) = &success.memory {
@@ -282,7 +286,7 @@ fn run_for_cycles(
     emulator: &mut Session,
     hardware: &mut TestHardware,
     cycles: usize,
-) -> Result<(), String> {
+) -> Result<(), std::convert::Infallible> {
     let mut elapsed = 0;
     while elapsed < cycles {
         elapsed += step(emulator, hardware)?.0;
@@ -295,7 +299,7 @@ fn run_until_opcode(
     hardware: &mut TestHardware,
     opcode: u8,
     max_cycles: usize,
-) -> Result<bool, String> {
+) -> Result<bool, std::convert::Infallible> {
     let mut elapsed = 0;
     while elapsed < max_cycles {
         let (ticks, executed_opcode) = step(emulator, hardware)?;
@@ -310,7 +314,7 @@ fn run_until_opcode(
 fn step(
     emulator: &mut Session,
     hardware: &mut TestHardware,
-) -> Result<(usize, Option<u8>), String> {
+) -> Result<(usize, Option<u8>), std::convert::Infallible> {
     let result = emulator.step();
     if let Some(frame) = result.frame {
         hardware.present_frame(frame)?;

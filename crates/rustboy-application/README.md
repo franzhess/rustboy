@@ -26,3 +26,21 @@ SDL3 implements the input, frame, and audio ports. The ROM test runner uses no-o
 ## Boundary
 
 This crate depends on `rustboy-core` only. It has no SDL dependency and no knowledge of paths, ZIP archives, terminal output, or debugger UI commands.
+
+## Platform errors
+
+`InputSource`, `FrameSink`, and `AudioSink` each declare their own associated
+`Error: std::error::Error + 'static` type. Adapters return concrete errors rather
+than strings; ports that cannot fail use `std::convert::Infallible`. A combined
+`Platform` may use a different error type for each port.
+
+`advance_frame` and `run` return `RunError`. Its `Input`, `Frame`, and `Audio`
+variants identify the failed operation, while `Error::source()` exposes the
+original adapter error for inspection or downcasting. Causes are boxed only when
+an operation fails, keeping SDL-specific types out of this crate. `Display` adds
+operation context, and the CLI supplies the outer user-facing diagnostic.
+
+A failure returns immediately: polling failures prevent input draining and machine
+advancement; output failures stop further stepping/delivery in that call. Already
+completed machine steps and delivered output are not rolled back. Tests inject
+failures for each operation without opening devices or relying on host sleeps.

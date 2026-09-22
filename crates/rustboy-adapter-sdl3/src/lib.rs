@@ -1,10 +1,12 @@
 mod display;
+mod error;
 mod input;
 mod sound;
 
 use crate::display::Display;
 use crate::input::Input;
 use crate::sound::Sound;
+pub use error::InitError;
 use rustboy_application::{AudioSink, FrameSink, InputSource, RunState};
 use rustboy_core::ButtonEvent;
 
@@ -15,8 +17,8 @@ pub struct Sdl3Adapter {
 }
 
 impl Sdl3Adapter {
-    pub fn new(width: u32, height: u32) -> Result<Self, String> {
-        let sdl = ::sdl3::init().map_err(|error| error.to_string())?;
+    pub fn new(width: u32, height: u32) -> Result<Self, InitError> {
+        let sdl = ::sdl3::init()?;
         Ok(Self {
             input: Input::new(&sdl)?,
             display: Display::new(&sdl, width, height)?,
@@ -24,17 +26,19 @@ impl Sdl3Adapter {
         })
     }
 
-    pub fn play(&mut self) -> Result<(), String> {
+    pub fn play(&mut self) -> Result<(), sdl3::Error> {
         self.sound.play()
     }
 
-    pub fn stop(&mut self) -> Result<(), String> {
+    pub fn stop(&mut self) -> Result<(), sdl3::Error> {
         self.sound.stop()
     }
 }
 
 impl InputSource for Sdl3Adapter {
-    fn poll_input(&mut self) -> Result<RunState, String> {
+    type Error = std::convert::Infallible;
+
+    fn poll_input(&mut self) -> Result<RunState, Self::Error> {
         Ok(self.input.poll())
     }
 
@@ -44,13 +48,17 @@ impl InputSource for Sdl3Adapter {
 }
 
 impl FrameSink for Sdl3Adapter {
-    fn present_frame(&mut self, frame: Vec<u8>) -> Result<(), String> {
+    type Error = sdl3::Error;
+
+    fn present_frame(&mut self, frame: Vec<u8>) -> Result<(), Self::Error> {
         self.display.draw_screen(frame)
     }
 }
 
 impl AudioSink for Sdl3Adapter {
-    fn queue_audio(&mut self, samples: Vec<i16>) -> Result<(), String> {
+    type Error = sdl3::Error;
+
+    fn queue_audio(&mut self, samples: Vec<i16>) -> Result<(), Self::Error> {
         self.sound.queue(samples)
     }
 }
