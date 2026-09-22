@@ -56,7 +56,7 @@ impl Registers {
             e: 0xD8,
             h: 0x01,
             l: 0x4D,
-            sp: 0xFFFF, //first stack address is 0xFFFE
+            sp: 0xFFFE,
             pc: 0x0100,
         }
     }
@@ -194,6 +194,18 @@ mod test {
         assert_eq!(test_registers.get_bc(), 0x3333);
         assert_eq!(test_registers.get_de(), 0x4444);
         assert_eq!(test_registers.get_hl(), 0x5555);
+    }
+
+    #[test]
+    fn dmg_initial_registers_match_the_post_boot_state() {
+        let registers = Registers::new();
+
+        assert_eq!(registers.get_af(), 0x01B0);
+        assert_eq!(registers.get_bc(), 0x0013);
+        assert_eq!(registers.get_de(), 0x00D8);
+        assert_eq!(registers.get_hl(), 0x014D);
+        assert_eq!(registers.sp, 0xFFFE);
+        assert_eq!(registers.pc, 0x0100);
     }
 
     #[test]
