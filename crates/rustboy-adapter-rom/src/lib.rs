@@ -30,6 +30,17 @@ impl std::fmt::Display for LoadError {
     }
 }
 
+impl std::error::Error for LoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Zip(error) => Some(error),
+            Self::Cartridge(error) => Some(error),
+            Self::FileTooLarge { .. } | Self::NoRomInArchive | Self::MultipleRomsInArchive => None,
+        }
+    }
+}
+
 pub fn load_rom(path: impl AsRef<Path>) -> Result<Cartridge, LoadError> {
     let path = path.as_ref();
     let limit = if path
@@ -94,4 +105,72 @@ fn extract_rom(bytes: Vec<u8>) -> Result<Vec<u8>, LoadError> {
         }
     }
     rom.ok_or(LoadError::NoRomInArchive)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{io, LoadError, RomLoadError};
+    use std::error::Error;
+    use zip::result::ZipError;
+
+    #[test]
+    fn io_source_preserves_error_kind_and_message() {
+        let error = LoadError::Io(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "ROM access denied",
+        ));
+        let cause = error
+            .source()
+            .expect("I/O cause")
+            .downcast_ref::<io::Error>()
+            .expect("original I/O error type");
+
+        assert_eq!(cause.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(cause.to_string(), "ROM access denied");
+        assert_eq!(error.to_string(), "ROM access denied");
+    }
+
+    #[test]
+    fn zip_source_preserves_nested_io_error() {
+        let error = LoadError::Zip(ZipError::Io(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "truncated ZIP data",
+        )));
+        let cause = error
+            .source()
+            .expect("ZIP cause")
+            .downcast_ref::<ZipError>()
+            .expect("original ZIP error type");
+
+        let ZipError::Io(io_error) = cause else {
+            panic!("expected nested I/O error, got {cause:?}");
+        };
+        assert_eq!(io_error.kind(), io::ErrorKind::UnexpectedEof);
+        assert_eq!(io_error.to_string(), "truncated ZIP data");
+        assert_eq!(error.to_string(), format!("invalid ZIP archive: {cause}"));
+    }
+
+    #[test]
+    fn cartridge_source_preserves_validation_details_and_ends_the_chain() {
+        let error = LoadError::Cartridge(RomLoadError::RomTooSmall { size: 42 });
+        let cause = error.source().expect("cartridge cause");
+
+        assert!(matches!(
+            cause.downcast_ref::<RomLoadError>(),
+            Some(RomLoadError::RomTooSmall { size: 42 })
+        ));
+        assert!(cause.source().is_none());
+        assert_eq!(error.to_string(), cause.to_string());
+    }
+
+    #[test]
+    fn adapter_validation_errors_have_no_underlying_source() {
+        for error in [
+            LoadError::FileTooLarge { limit: 8 },
+            LoadError::NoRomInArchive,
+            LoadError::MultipleRomsInArchive,
+        ] {
+            assert!(error.source().is_none());
+        }
+    }
 }

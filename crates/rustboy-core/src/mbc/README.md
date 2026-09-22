@@ -26,6 +26,13 @@ RAM index = selected bank × 0x2000 + offset within the 8 KiB window
 
 ### Cartridge headers
 
+`Cartridge::from_bytes` returns `Result<Cartridge, RomLoadError>`. Oversized images,
+images too short to read the cartridge-type byte, and unsupported cartridge types
+produce typed validation errors. `RomLoadError` implements `Display` and
+`std::error::Error`; its variants have no underlying source. Filesystem and ZIP
+errors belong to the ROM adapter, which can wrap these cartridge errors in its own
+error chain.
+
 `Cartridge::from_bytes` selects the implementation using header byte `0x0147`:
 
 | Type code | Hardware configuration | Rustboy implementation |

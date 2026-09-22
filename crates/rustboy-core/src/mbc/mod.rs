@@ -41,6 +41,8 @@ impl fmt::Display for RomLoadError {
     }
 }
 
+impl std::error::Error for RomLoadError {}
+
 pub(crate) trait Mbc: Send {
     fn read_rom(&self, address: u16) -> u8;
     fn read_ram(&self, address: u16) -> u8;
@@ -97,6 +99,21 @@ impl Cartridge {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::error::Error;
+
+    #[test]
+    fn cartridge_validation_errors_have_no_underlying_source() {
+        for error in [
+            RomLoadError::FileTooLarge {
+                limit: MAX_ROM_SIZE,
+            },
+            RomLoadError::RomTooSmall { size: 0 },
+            RomLoadError::UnsupportedCartridge(0x10),
+        ] {
+            let error: &dyn Error = &error;
+            assert!(error.source().is_none());
+        }
+    }
 
     fn rom_with_type(cartridge_type: u8) -> Vec<u8> {
         let mut rom = vec![0; MIN_ROM_SIZE];
