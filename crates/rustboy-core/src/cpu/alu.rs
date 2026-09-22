@@ -60,7 +60,7 @@ pub fn add(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
 pub fn add16(flag_register: &mut dyn FlagRegister, value1: u16, value2: u16) -> u16 {
     let result = value1.wrapping_add(value2);
     flag_register.set_flag(CpuFlag::N, false);
-    flag_register.set_flag(CpuFlag::H, ((value1 & 0x07FF) + (value2 & 0x07FF)) > 0x07FF);
+    flag_register.set_flag(CpuFlag::H, ((value1 & 0x0FFF) + (value2 & 0x0FFF)) > 0x0FFF);
     flag_register.set_flag(CpuFlag::C, value1 > 0xFFFF - value2);
     result
 }
@@ -312,4 +312,40 @@ pub fn bit(flag_register: &mut dyn FlagRegister, bit: u8, value: u8) {
     flag_register.set_flag(CpuFlag::Z, (value & (1 << bit)) == 0);
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, true);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::add16;
+    use crate::cpu::registers::Registers;
+
+    #[test]
+    fn add16_updates_carry_flags_clears_n_and_preserves_z() {
+        // ADD HL,rr sets H on carry from bit 11, not bit 10. Expected flag
+        // bytes below contain H/C only; Z is preserved and N is always cleared.
+        for (lhs, rhs, expected_result, expected_hc) in [
+            (0x0800, 0x0800, 0x1000, 0x20), // Bit 11 carry without bit 10 carry.
+            (0x07FF, 0x0001, 0x0800, 0x00), // Bit 10 carry alone must not set H.
+            (0x0FFF, 0x0001, 0x1000, 0x20),
+            (0x8000, 0x8000, 0x0000, 0x10), // Full carry without half-carry.
+            (0xFFFF, 0x0001, 0x0000, 0x30), // Both carries and a wrapped result.
+            (0xFFFF, 0xFFFF, 0xFFFE, 0x30),
+            (0x1234, 0x0001, 0x1235, 0x00),
+            (0x0000, 0x0000, 0x0000, 0x00), // A zero result must not change Z.
+        ] {
+            for initial_flags in (0..=0xF0).step_by(0x10) {
+                let mut registers = Registers::new();
+                registers.set_af(initial_flags);
+
+                let result = add16(&mut registers, lhs, rhs);
+
+                assert_eq!(result, expected_result, "{lhs:04X} + {rhs:04X}");
+                assert_eq!(
+                    registers.get_af() as u8,
+                    (initial_flags as u8 & 0x80) | expected_hc,
+                    "{lhs:04X} + {rhs:04X}, initial flags {initial_flags:02X}"
+                );
+            }
+        }
+    }
 }
