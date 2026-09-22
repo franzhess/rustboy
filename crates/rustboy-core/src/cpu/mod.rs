@@ -369,7 +369,7 @@ mod tests {
         assert_eq!(cpu.registers.pc, 0x0040);
         assert_eq!(cpu.registers.sp, 0xFFFC);
         assert_eq!(cpu.mmu.read_word(0xFFFC), 0x1234);
-        assert_eq!(cpu.mmu.read_byte(0xFF0F), 0b0000_0100);
+        assert_eq!(cpu.mmu.read_byte(0xFF0F), 0b1110_0100);
 
         // Twenty T-cycles include the timer's first bit-3 falling edge at cycle 16.
         assert_eq!(cpu.mmu.read_byte(0xFF05), 1);

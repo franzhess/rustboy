@@ -53,7 +53,7 @@ impl Mmu {
             0xFF00 => self.joypad.read(),                            //Joypad
             0xFF01..=0xFF02 => self.serial.read(address),            //serial
             0xFF04..=0xFF07 => self.timer.read_byte(address),        //TIMER
-            0xFF0F => self.interrupt_request,
+            0xFF0F => self.interrupt_request | 0xE0,
             0xFF10..=0xFF3F => self.apu.read_byte(address), //sound
             0xFF46 => self.voam_oam,
             0xFF40..=0xFF4B => self.ppu.read_byte(address),
@@ -80,7 +80,7 @@ impl Mmu {
             0xFF00 => self.joypad.write(value),                              //JOYPAD
             0xFF01..=0xFF02 => self.serial.write(address, value),            //serial
             0xFF04..=0xFF07 => self.timer.write_byte(address, value),        //timer
-            0xFF0F => self.interrupt_request = value,
+            0xFF0F => self.interrupt_request = value & 0x1F,
             0xFF10..=0xFF3F => self.apu.write_byte(address, value), //sound
             0xFF46 => {
                 self.voam_oam = value;
@@ -172,6 +172,17 @@ mod tests {
 
         mmu.write_word(0xFFFF, 0xABCD);
         assert_eq!(mmu.interrupt_enable, 0xCD);
+    }
+
+    #[test]
+    fn interrupt_request_reads_unused_bits_as_one() {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+
+        mmu.write_byte(0xFF0F, 0xFF);
+
+        assert_eq!(mmu.read_byte(0xFF0F), 0xFF);
+        mmu.write_byte(0xFF0F, 0x00);
+        assert_eq!(mmu.read_byte(0xFF0F), 0xE0);
     }
 }
 
