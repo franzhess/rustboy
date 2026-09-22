@@ -68,10 +68,10 @@ impl Apu {
                 if self.channel_1.is_enabled() {
                     ret |= 0b0000_0001;
                 }
-                ret
+                ret | 0x70
             }
             0xFF30..=0xFF3F => self.channel_3.read_byte(address),
-            _ => 0,
+            _ => 0xFF,
         }
     }
 

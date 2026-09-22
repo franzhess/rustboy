@@ -33,9 +33,9 @@ impl Noise {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0xFF20 => self.length_data,
+            0xFF20 => self.length_data | 0xC0,
             0xFF21 => self.volume_envelope.read_byte(),
-            _ => 0,
+            _ => 0x3F,
         }
     }
 

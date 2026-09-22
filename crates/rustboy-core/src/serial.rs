@@ -14,7 +14,7 @@ impl Serial {
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0xFF01 => self.last_byte_written,
-            0xFF02 => self.other_byte,
+            0xFF02 => self.other_byte | 0x7E,
             _ => 0,
         }
     }

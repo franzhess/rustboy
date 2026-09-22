@@ -31,7 +31,7 @@ impl Timer {
             0xFF05 => self.timer_counter,
             0xFF06 => self.timer_modulo,
             0xFF07 => {
-                (if self.timer_enabled { 0x04 } else { 0x0 })
+                0xF8 | (if self.timer_enabled { 0x04 } else { 0x0 })
                     | (match self.timer_bit {
                         9 => 0x00,
                         3 => 0x01,

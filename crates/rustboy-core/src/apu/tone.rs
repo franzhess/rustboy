@@ -42,7 +42,7 @@ impl Tone {
 
     pub fn read_byte(&self, address: u16) -> u8 {
         match address {
-            0xFF10 => self.sweep.read_byte(),
+            0xFF10 => self.sweep.read_byte() | 0x80,
             0xFF11 | 0xFF16 => 0,
             0xFF12 | 0xFF17 => self.volume_envelope.read_byte(),
             0xFF13 | 0xFF18 => 0,

@@ -52,14 +52,15 @@ impl Mmu {
             0xFEA0..=0xFEFF => 0,                                    //not useable
             0xFF00 => self.joypad.read(),                            //Joypad
             0xFF01..=0xFF02 => self.serial.read(address),            //serial
-            0xFF04..=0xFF07 => self.timer.read_byte(address),        //TIMER
+            0xFF03 | 0xFF08..=0xFF0E => 0xFF,
+            0xFF04..=0xFF07 => self.timer.read_byte(address), //TIMER
             0xFF0F => self.interrupt_request | 0xE0,
             0xFF10..=0xFF3F => self.apu.read_byte(address), //sound
             0xFF46 => self.voam_oam,
             0xFF40..=0xFF4B => self.ppu.read_byte(address),
+            0xFF4C..=0xFF7F => 0xFF,
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
             0xFFFF => self.interrupt_enable,
-            _ => 0,
         }
     }
 
@@ -183,6 +184,39 @@ mod tests {
         assert_eq!(mmu.read_byte(0xFF0F), 0xFF);
         mmu.write_byte(0xFF0F, 0x00);
         assert_eq!(mmu.read_byte(0xFF0F), 0xE0);
+    }
+
+    #[test]
+    fn unused_hardware_io_bits_read_as_one() {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+
+        for (address, mask) in [
+            (0xFF00, 0xC0),
+            (0xFF02, 0x7E),
+            (0xFF07, 0xF8),
+            (0xFF41, 0x80),
+            (0xFF10, 0x80),
+            (0xFF1A, 0x7F),
+            (0xFF1C, 0x9F),
+            (0xFF20, 0xC0),
+            (0xFF23, 0x3F),
+            (0xFF26, 0x70),
+        ] {
+            mmu.write_byte(address, 0x00);
+            assert_eq!(mmu.read_byte(address) & mask, mask);
+            mmu.write_byte(address, 0xFF);
+            assert_eq!(mmu.read_byte(address) & mask, mask);
+        }
+
+        for address in [
+            0xFF03, 0xFF08, 0xFF09, 0xFF0A, 0xFF0B, 0xFF0C, 0xFF0D, 0xFF0E, 0xFF15, 0xFF1F, 0xFF27,
+            0xFF28, 0xFF29, 0xFF4C, 0xFF7F,
+        ] {
+            mmu.write_byte(address, 0x00);
+            assert_eq!(mmu.read_byte(address), 0xFF);
+            mmu.write_byte(address, 0xFF);
+            assert_eq!(mmu.read_byte(address), 0xFF);
+        }
     }
 }
 

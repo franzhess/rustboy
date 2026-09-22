@@ -29,8 +29,12 @@ impl Wave {
         self.enabled
     }
 
-    pub fn read_byte(&self, _address: u16) -> u8 {
-        0
+    pub fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0xFF1A => 0x7F,
+            0xFF1C => 0x9F,
+            _ => 0,
+        }
     }
 
     pub fn write_byte(&mut self, address: u16, value: u8) {

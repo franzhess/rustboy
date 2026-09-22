@@ -106,7 +106,7 @@ impl Ppu {
             }
             0xFF41 => {
                 // LCD Status
-                (if self.irq_lyc_enable { 0x40 } else { 0x00 })
+                0x80 | (if self.irq_lyc_enable { 0x40 } else { 0x00 })
                     | (if self.irq_m2_enable { 0x20 } else { 0x00 })
                     | (if self.irq_m1_enable { 0x10 } else { 0x00 })
                     | (if self.irq_m0_enable { 0x08 } else { 0x00 })
