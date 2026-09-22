@@ -87,3 +87,48 @@ impl Machine {
         self.cpu.registers()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cartridge_can_wait_for_vblank_before_initializing_the_lcd() {
+        let mut rom = vec![0; 0x8000];
+        rom[0x100..0x110].copy_from_slice(&[
+            0xF0, 0x44, // LDH A,(LY)
+            0xFE, 0x90, // CP 144
+            0x38, 0xFA, // JR C,0100
+            0xAF, // XOR A
+            0xE0, 0x40, // LDH (LCDC),A: disable LCD after reaching VBlank
+            0x3E, 0x42, // LD A,42
+            0xEA, 0x00, 0xC0, // LD (C000),A: startup completed
+            0x18, 0xFE, // JR -2
+        ]);
+        let mut machine = Machine::new(Cartridge::from_bytes(rom).expect("valid ROM"));
+        let mut cycles = 0;
+        let mut saw_frame = false;
+        while cycles < 70_224 && machine.read_byte(0xC000) != 0x42 {
+            let step = machine.step();
+            cycles += step.cycles;
+            saw_frame |= step.frame.is_some();
+        }
+
+        assert_eq!(machine.read_byte(0xC000), 0x42, "startup wait must finish");
+        assert!(saw_frame, "the initially enabled LCD must produce a frame");
+        assert_ne!(
+            machine.read_byte(0xFF0F) & 1,
+            0,
+            "VBlank must request an IRQ"
+        );
+        assert_eq!(machine.read_byte(0xFF40), 0);
+        assert_eq!(machine.read_byte(0xFF44), 0);
+    }
+
+    #[test]
+    fn machine_starts_with_post_boot_lcd_control() {
+        let machine = Machine::new(Cartridge::from_bytes(vec![0; 0x8000]).expect("valid ROM"));
+
+        assert_eq!(machine.read_byte(0xFF40), 0x91);
+    }
+}

@@ -41,6 +41,9 @@ pub struct Ppu {
 
 impl Ppu {
     pub fn new() -> Ppu {
+        // Execution skips the DMG boot ROM, which leaves LCDC at 0x91:
+        // LCD and background enabled, with unsigned tile addressing.
+        // Games may wait for VBlank before their first LCDC write.
         Ppu {
             screen_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
             color_buffer: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
@@ -50,14 +53,14 @@ impl Ppu {
             clock: 0, // for the first line
             vram: [0; VRAM_SIZE],
             voam: [0; VOAM_SIZE],
-            lcd_enabled: false,
+            lcd_enabled: true,
             window_tilemap_select: false,
             window_enable: false,
-            bg_window_tile_addressing: false,
+            bg_window_tile_addressing: true,
             bg_tilemap_select: false,
             sprite_size: 8,
             sprite_enable: false,
-            bg_window_priority: false,
+            bg_window_priority: true,
             mode: 0x00,
             irq_m0_enable: false,
             irq_m1_enable: false,
