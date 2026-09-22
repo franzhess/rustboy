@@ -339,6 +339,43 @@ mod tests {
     }
 
     #[test]
+    fn signed_sp_instructions_extend_offsets_and_write_the_correct_destination() {
+        for (sp, immediate, expected, flags) in [
+            (0x0000, 0xFF, 0xFFFF, 0x00), // -1 wraps without low-byte carries.
+            (0x0001, 0xFF, 0x0000, 0x30),
+            (0x0080, 0x80, 0x0000, 0x10), // -128, with byte carry but no half-carry.
+            (0xFFFF, 0x01, 0x0000, 0x30),
+            (0x000F, 0x01, 0x0010, 0x20),
+            (0xFF81, 0x7F, 0x0000, 0x30), // +127 wraps at the top of memory.
+        ] {
+            for (opcode, cycles) in [(0xE8, 16), (0xF8, 12)] {
+                let mut cpu = cpu_with_program(&[opcode, immediate]);
+                cpu.registers.sp = sp;
+                cpu.registers.set_hl(0x1234);
+                cpu.registers.set_af(0x5AF0);
+
+                assert_step(&mut cpu, cycles, Some(opcode));
+
+                let (expected_sp, expected_hl) = if opcode == 0xE8 {
+                    (expected, 0x1234)
+                } else {
+                    (sp, expected)
+                };
+                assert_eq!(
+                    (
+                        cpu.registers.sp,
+                        cpu.registers.get_hl(),
+                        cpu.registers.get_af(),
+                        cpu.registers.pc
+                    ),
+                    (expected_sp, expected_hl, 0x5A00 | flags, 0x102),
+                    "opcode={opcode:02X}, SP={sp:04X}, immediate={immediate:02X}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn not_taken_conditional_jump_wraps_while_skipping_its_operand() {
         let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0xFFFF;
