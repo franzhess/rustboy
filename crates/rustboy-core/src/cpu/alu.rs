@@ -89,7 +89,6 @@ pub fn sub(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     flag_register.set_flag(CpuFlag::N, true);
     flag_register.set_flag(CpuFlag::H, (value1 & 0x0F) < (value2 & 0x0F));
     flag_register.set_flag(CpuFlag::C, (value1 as u16) < (value2 as u16));
-    //println!("{} - {} = {} flags: {:08b}",value1, value2, result, flag_register.get_raw());
     result
 }
 

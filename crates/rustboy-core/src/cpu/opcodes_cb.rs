@@ -1,12 +1,12 @@
 use crate::cpu::alu;
 use crate::cpu::registers::RegisterName8;
 use crate::cpu::Cpu;
-use crate::cpu::OpCodeResult;
-use crate::cpu::OpCodeResult::Executed;
+use crate::cpu::OpcodeResult;
+use crate::cpu::OpcodeResult::Executed;
 
 #[allow(unreachable_patterns)]
-pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
-    match op_code {
+pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
+    match opcode {
         0x00 => {
             cpu.execute(alu::rlc, RegisterName8::B);
             Executed(8)

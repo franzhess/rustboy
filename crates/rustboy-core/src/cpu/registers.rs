@@ -73,7 +73,7 @@ impl Registers {
         }
     }
 
-    pub fn get16(&mut self, name: RegisterName16) -> u16 {
+    pub fn get16(&self, name: RegisterName16) -> u16 {
         match name {
             RegisterName16::BC => self.get_bc(),
             RegisterName16::DE => self.get_de(),
@@ -98,13 +98,15 @@ impl Registers {
         (self.h as u16) << 8 | self.l as u16
     }
 
-    pub fn get_hli(&mut self) -> u16 {
+    /// Increments HL with 16-bit wraparound and returns its original value.
+    pub fn post_increment_hl(&mut self) -> u16 {
         let hl = self.get_hl();
         self.set_hl(hl.wrapping_add(1));
         hl
     }
 
-    pub fn get_hld(&mut self) -> u16 {
+    /// Decrements HL with 16-bit wraparound and returns its original value.
+    pub fn post_decrement_hl(&mut self) -> u16 {
         let hl = self.get_hl();
         self.set_hl(hl.wrapping_sub(1));
         hl
@@ -209,14 +211,14 @@ mod test {
     }
 
     #[test]
-    fn test_hl_sepcial() {
+    fn hl_post_increment_and_decrement_return_the_original_address() {
         let mut test_registers = Registers::new();
 
         test_registers.set_hl(0x1234);
-        assert_eq!(test_registers.get_hld(), 0x1234);
-        assert_eq!(test_registers.get_hld(), 0x1233);
-        assert_eq!(test_registers.get_hli(), 0x1232);
-        assert_eq!(test_registers.get_hli(), 0x1233);
+        assert_eq!(test_registers.post_decrement_hl(), 0x1234);
+        assert_eq!(test_registers.post_decrement_hl(), 0x1233);
+        assert_eq!(test_registers.post_increment_hl(), 0x1232);
+        assert_eq!(test_registers.post_increment_hl(), 0x1233);
         assert_eq!(test_registers.get_hl(), 0x1234);
     }
 }

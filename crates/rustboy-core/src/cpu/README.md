@@ -12,8 +12,8 @@ It owns the MMU and drives devices using emulated cycles, not host time.
 | [`mod.rs`](mod.rs) | Step loop, fetch helpers, stack, interrupt dispatch, EI/HALT state |
 | [`registers.rs`](registers.rs) | Registers, flags, register-pair access, HL auto-increment/decrement |
 | [`alu.rs`](alu.rs) | Arithmetic/logic operations and their flag updates |
-| [`op_codes.rs`](op_codes.rs) | Base opcode dispatch and instruction durations |
-| [`op_codes_cb.rs`](op_codes_cb.rs) | CB-prefixed rotates, shifts, bit tests, resets, and sets |
+| [`opcodes.rs`](opcodes.rs) | Base opcode dispatch and instruction durations |
+| [`opcodes_cb.rs`](opcodes_cb.rs) | CB-prefixed rotates, shifts, bit tests, resets, and sets |
 | [`timing_tests.rs`](timing_tests.rs) | Reference timings for every legal base/CB instruction |
 
 ## Registers and operands
@@ -32,13 +32,17 @@ carry/borrow. Half-carry is relevant to nibble arithmetic and decimal adjustment
 its boundary depends on the operation. Setting AF masks F with `0xF0` so POP AF
 cannot set nonexistent flag bits.
 
+`Registers::get16(&self, name)` reads BC, DE, HL or SP without requiring mutable
+access. `get_hl()` likewise reads the pair without changing it.
+
 `(HL)` denotes the byte in memory at the address held in HL, not the low byte of
-HL. `get_hli` and `get_hld` return the original address and then increment/decrement
-HL with wrapping arithmetic. Instructions such as `LD (HL+),A` therefore access
-the old address before changing the pair.
+HL. `post_increment_hl` and `post_decrement_hl` return the original address and
+update HL with 16-bit wrapping arithmetic. Instructions such as `LD (HL+),A`
+therefore use the old address for their memory access. These helpers update the
+pair before returning; they do not model the hardware's bus-phase ordering.
 
 Construction starts at PC `0x0100`, with AF=`01B0`, BC=`0013`, DE=`00D8`, HL=`014D`,
-and SP=`FFFF`. These are current implementation defaults, not the result of an
+and SP=`FFFE`. These are current implementation defaults, not the result of an
 emulated boot ROM or a guarantee of exact DMG post-boot state. IME starts clear.
 
 ## One CPU step
@@ -51,13 +55,14 @@ emulated boot ROM or a guarantee of exact DMG post-boot state. IME starts clear.
 4. Complete pending EI-delay bookkeeping after an executed instruction.
 5. Advance the MMU's timer, PPU, and APU by the step's total T-cycles.
 
-The opcode handlers return `Executed(t_cycles)` or `UnknownOpCode`. The public
-machine returns the executed **base** opcode; CB instructions report `0xCB`.
+The opcode handlers return `OpcodeResult::Executed(t_cycles)` or
+`OpcodeResult::UnknownOpcode`. The public machine returns the executed **base**
+opcode; CB instructions report `0xCB`.
 Interrupt entry and HALT idle return no opcode. An awake `next_opcode()` peek can
 be superseded by an interrupt and must not be used as an execution trace.
 
 All legal opcode encodings are dispatched. The eleven illegal base encodings
-return `UnknownOpCode`; the step loop currently prints a diagnostic, enters its
+return `UnknownOpcode`; the step loop currently prints a diagnostic, enters its
 halted state, and consumes four cycles. This fallback does not model hardware
 illegal-opcode lockup semantics.
 
@@ -69,7 +74,9 @@ illegal-opcode lockup semantics.
   the operand. The cast through `i8` and `i16` preserves negative offsets before
   `wrapping_add` applies them in the 16-bit address space.
 - `CALL` saves the PC after its immediate address has been fetched; that is the
-  return address. `RET` restores PC from the stack.
+  return address. `return_from_call` restores PC by popping the stack; it is used
+  by `RET`, taken conditional returns, and `RETI`. The `RETI` handler also enables
+  IME immediately.
 - The stack grows downward: push subtracts two from SP and writes a little-endian
   word; pop reads the word and adds two. These are aggregate operations, not a
   model of the hardware's individual stack-write bus phases.
@@ -150,6 +157,7 @@ its distinct low-power/input-resume behavior is not implemented.
 
 ```sh
 cargo test -p rustboy-core cpu::
+cargo test -p rustboy-core cpu::alu::tests
 cargo test -p rustboy-core cpu::timing_tests
 ```
 
@@ -159,6 +167,14 @@ both outcomes of every conditional branch. Illegal base opcodes are checked as
 unsupported; they are not assigned hardware timing by the reference table.
 Separate tests cover device advancement, address wrapping, interrupt priority,
 EI/DI/RETI delays, HALT wake-up, and fetch suppression.
+
+ALU semantic tests check results and flags independently of instruction durations:
+all byte operand/flag combinations for arithmetic and logical operations, all
+byte/flag combinations for rotations, shifts and flag control, and half-carry
+boundaries for `ADD HL,rr`. DAA is checked against decimal arithmetic for all valid
+two-digit BCD operand pairs plus selected non-BCD cases. Signed SP-addition tests
+cover every signed offset at selected SP boundaries; instruction-level E8/F8 tests
+also verify sign extension, destinations, preserved A, PC and cycle totals.
 
 Known remaining boundaries include reload-cycle TIMA/TMA write priority and IE
 changes during interrupt-entry stack writes, which need finer bus scheduling.

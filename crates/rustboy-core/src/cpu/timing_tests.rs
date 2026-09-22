@@ -1,4 +1,4 @@
-use super::{op_codes, tests::cpu_with_program, Cpu, OpCodeResult};
+use super::{opcodes, tests::cpu_with_program, Cpu, OpcodeResult};
 
 // SM83 instruction durations in T-cycles, with conditional branches NOT taken.
 // Reference: https://gbdev.io/gb-opcodes/optables/ (normal-speed DMG).
@@ -49,8 +49,8 @@ fn every_base_opcode_has_the_documented_duration_for_all_flag_combinations() {
             let mut cpu = cpu(&[opcode, 0, 0xC4], flags);
             if base == 0 {
                 assert!(matches!(
-                    op_codes::execute(opcode, &mut cpu),
-                    OpCodeResult::UnknownOpCode
+                    opcodes::execute(opcode, &mut cpu),
+                    OpcodeResult::UnknownOpcode
                 ));
                 continue;
             }

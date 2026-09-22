@@ -1,6 +1,6 @@
 mod alu;
-mod op_codes;
-mod op_codes_cb;
+mod opcodes;
+mod opcodes_cb;
 mod registers;
 
 #[cfg(test)]
@@ -11,9 +11,9 @@ use crate::mbc::Mbc;
 use crate::mmu::Mmu;
 use crate::ButtonEvent;
 
-pub enum OpCodeResult {
+pub enum OpcodeResult {
     Executed(usize),
-    UnknownOpCode,
+    UnknownOpcode,
 }
 
 pub struct CpuStepResult {
@@ -156,16 +156,14 @@ impl Cpu {
 
     fn do_cycle(&mut self) -> CpuStepResult {
         let current_address = self.registers.pc;
-        let op_code = self.fetch_byte();
+        let opcode = self.fetch_byte();
 
-        //println!("do_cycle: {:#04X} @ {:#06X}", op_code, current_address);
-
-        let cycles = match op_codes::execute(op_code, self) {
-            OpCodeResult::Executed(ticks) => ticks,
-            OpCodeResult::UnknownOpCode => {
+        let cycles = match opcodes::execute(opcode, self) {
+            OpcodeResult::Executed(ticks) => ticks,
+            OpcodeResult::UnknownOpcode => {
                 println!(
                     "Unknown command {:#04X} at {:#06X}",
-                    op_code, current_address
+                    opcode, current_address
                 );
                 self.halted = true;
                 4
@@ -173,7 +171,7 @@ impl Cpu {
         };
         CpuStepResult {
             cycles,
-            opcode: Some(op_code),
+            opcode: Some(opcode),
         }
     }
 
@@ -197,24 +195,21 @@ impl Cpu {
 
     fn push(&mut self, value: u16) {
         self.registers.sp = self.registers.sp.wrapping_sub(2); //stack grows down from 0xFFFE and stores words
-                                                               //println!("pushing {:06X} to   {:06X}", value, self.registers.sp);
         self.mmu.write_word(self.registers.sp, value);
     }
 
     fn pop(&mut self) -> u16 {
         let result = self.mmu.read_word(self.registers.sp);
-        //println!("popping {:06X} from {:06X}", result, self.registers.sp);
         self.registers.sp = self.registers.sp.wrapping_add(2);
         result
     }
 
     fn call(&mut self, address: u16) {
-        //println!("CALL {:#06X}@{:#04X}", address, self.registers.pc - 1);
         self.push(self.registers.pc); //it's not pc + 1 because after fetching the address the pc is already at the next instruction
         self.registers.pc = address;
     }
 
-    fn retrn(&mut self) {
+    fn return_from_call(&mut self) {
         self.registers.pc = self.pop();
     }
 
@@ -260,7 +255,7 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
-    use super::{op_codes, Cpu};
+    use super::{opcodes, Cpu};
     use crate::cpu::registers::{CpuFlag, FlagRegister};
     use crate::mbc::Mbc;
 
@@ -382,7 +377,7 @@ mod tests {
         cpu.registers.set_flag(CpuFlag::Z, true);
 
         // PC already points to JR NZ's one-byte operand after its opcode was fetched.
-        op_codes::execute(0x20, &mut cpu);
+        opcodes::execute(0x20, &mut cpu);
 
         assert_eq!(cpu.registers.pc, 0);
     }

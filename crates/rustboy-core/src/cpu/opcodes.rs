@@ -1,14 +1,13 @@
 use crate::cpu::alu;
-use crate::cpu::op_codes_cb;
+use crate::cpu::opcodes_cb;
 use crate::cpu::registers::CpuFlag;
 use crate::cpu::registers::{FlagRegister, RegisterName16, RegisterName8};
 use crate::cpu::Cpu;
-use crate::cpu::OpCodeResult;
-use crate::cpu::OpCodeResult::{Executed, UnknownOpCode};
+use crate::cpu::OpcodeResult;
+use crate::cpu::OpcodeResult::{Executed, UnknownOpcode};
 
-pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
-    //println!("Executing OP Code: {:#04X}", op_code);
-    match op_code {
+pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
+    match opcode {
         0x00 => Executed(4), //NOOP
         0x01 => {
             let next_word = cpu.fetch_word();
@@ -153,7 +152,8 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(12)
         } //LD HL,nn
         0x22 => {
-            cpu.mmu.write_byte(cpu.registers.get_hli(), cpu.registers.a);
+            cpu.mmu
+                .write_byte(cpu.registers.post_increment_hl(), cpu.registers.a);
             Executed(8)
         } //LD (HL+),A
         0x23 => {
@@ -190,7 +190,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(8)
         } //ADD HL,HL
         0x2A => {
-            cpu.registers.a = cpu.mmu.read_byte(cpu.registers.get_hli());
+            cpu.registers.a = cpu.mmu.read_byte(cpu.registers.post_increment_hl());
             Executed(8)
         } //LD A,(HL+)
         0x2B => {
@@ -227,7 +227,8 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(12)
         } //LD SP,nn
         0x32 => {
-            cpu.mmu.write_byte(cpu.registers.get_hld(), cpu.registers.a);
+            cpu.mmu
+                .write_byte(cpu.registers.post_decrement_hl(), cpu.registers.a);
             Executed(8)
         } //LD (HL-),A
         0x33 => {
@@ -269,7 +270,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             Executed(8)
         } //ADD HL,SP
         0x3A => {
-            cpu.registers.a = cpu.mmu.read_byte(cpu.registers.get_hld());
+            cpu.registers.a = cpu.mmu.read_byte(cpu.registers.post_decrement_hl());
             Executed(8)
         } //LD A,(HL-)
         0x3B => {
@@ -791,7 +792,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //CP A
         0xC0 => {
             if !cpu.registers.get_flag(CpuFlag::Z) {
-                cpu.retrn();
+                cpu.return_from_call();
                 Executed(20)
             } else {
                 Executed(8)
@@ -840,14 +841,14 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RST 00H
         0xC8 => {
             if cpu.registers.get_flag(CpuFlag::Z) {
-                cpu.retrn();
+                cpu.return_from_call();
                 Executed(20)
             } else {
                 Executed(8)
             }
         } //RET Z
         0xC9 => {
-            cpu.retrn();
+            cpu.return_from_call();
             Executed(16)
         } //RET
         0xCA => {
@@ -861,7 +862,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //JP Z,nn
         0xCB => {
             let op = cpu.fetch_byte();
-            op_codes_cb::execute(op, cpu)
+            opcodes_cb::execute(op, cpu)
         } //CB
         0xCC => {
             if cpu.registers.get_flag(CpuFlag::Z) {
@@ -889,7 +890,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RST 08H
         0xD0 => {
             if !cpu.registers.get_flag(CpuFlag::C) {
-                cpu.retrn();
+                cpu.return_from_call();
                 Executed(20)
             } else {
                 Executed(8)
@@ -935,7 +936,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RST 10H
         0xD8 => {
             if cpu.registers.get_flag(CpuFlag::C) {
-                cpu.retrn();
+                cpu.return_from_call();
                 Executed(20)
             } else {
                 Executed(8)
@@ -943,7 +944,7 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
         } //RET C
         0xD9 => {
             cpu.ime = true;
-            cpu.retrn();
+            cpu.return_from_call();
             Executed(16)
         } //RETI (return and enable interrupts)
         0xDA => {
@@ -1103,6 +1104,6 @@ pub fn execute(op_code: u8, cpu: &mut Cpu) -> OpCodeResult {
             cpu.call(0x0038);
             Executed(16)
         } //RST 0x0038
-        _ => UnknownOpCode,
+        _ => UnknownOpcode,
     }
 }
