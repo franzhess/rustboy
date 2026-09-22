@@ -316,8 +316,107 @@ pub fn bit(flag_register: &mut dyn FlagRegister, bit: u8, value: u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::add16;
+    use super::{adc, add, add16, cp, dec, inc, sbc, sub};
     use crate::cpu::registers::Registers;
+    use crate::cpu::{BinaryOperation8, UnaryOperation8};
+
+    // Use a signed, widened result for overflow/borrow and the operand/result
+    // XOR identity for carry/borrow across bit 3. This avoids reproducing the
+    // implementation's masked-nibble addition and comparison expressions.
+    fn arithmetic_result(lhs: u8, rhs: u8, wide: i16, subtract: bool) -> (u8, u8) {
+        let result = wide as u8;
+        let flags = (u8::from(result == 0) << 7)
+            | (u8::from(subtract) << 6)
+            | (((lhs ^ rhs ^ result) & 0x10) << 1)
+            | (u8::from(!(0..=255).contains(&wide)) << 4);
+        (result, flags)
+    }
+
+    fn check_binary(operation: BinaryOperation8, expected: impl Fn(u8, u8, u8) -> (u8, u8)) {
+        let mut registers = Registers::new();
+        for lhs in 0..=u8::MAX {
+            for rhs in 0..=u8::MAX {
+                for flags in (0..=0xF0u8).step_by(0x10) {
+                    registers.set_af(u16::from(lhs) << 8 | u16::from(flags));
+                    let result = operation(&mut registers, lhs, rhs);
+                    assert_eq!(
+                        (result, registers.get_af() as u8),
+                        expected(lhs, rhs, flags),
+                        "lhs={lhs:02X}, rhs={rhs:02X}, initial flags={flags:02X}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn check_unary(operation: UnaryOperation8, expected: impl Fn(u8, u8) -> (u8, u8)) {
+        let mut registers = Registers::new();
+        for value in 0..=u8::MAX {
+            for flags in (0..=0xF0u8).step_by(0x10) {
+                registers.set_af(u16::from(value) << 8 | u16::from(flags));
+                let result = operation(&mut registers, value);
+                assert_eq!(
+                    (result, registers.get_af() as u8),
+                    expected(value, flags),
+                    "value={value:02X}, initial flags={flags:02X}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn add_matches_widened_arithmetic_for_all_operands_and_flags() {
+        check_binary(add, |lhs, rhs, _| {
+            arithmetic_result(lhs, rhs, i16::from(lhs) + i16::from(rhs), false)
+        });
+    }
+
+    #[test]
+    fn adc_matches_widened_arithmetic_for_all_operands_and_flags() {
+        check_binary(adc, |lhs, rhs, flags| {
+            let carry = i16::from(flags & 0x10 != 0);
+            arithmetic_result(lhs, rhs, i16::from(lhs) + i16::from(rhs) + carry, false)
+        });
+    }
+
+    #[test]
+    fn sub_matches_widened_arithmetic_for_all_operands_and_flags() {
+        check_binary(sub, |lhs, rhs, _| {
+            arithmetic_result(lhs, rhs, i16::from(lhs) - i16::from(rhs), true)
+        });
+    }
+
+    #[test]
+    fn sbc_matches_widened_arithmetic_for_all_operands_and_flags() {
+        check_binary(sbc, |lhs, rhs, flags| {
+            let borrow = i16::from(flags & 0x10 != 0);
+            arithmetic_result(lhs, rhs, i16::from(lhs) - i16::from(rhs) - borrow, true)
+        });
+    }
+
+    #[test]
+    fn cp_returns_left_operand_and_sets_subtraction_flags_for_all_inputs() {
+        check_binary(cp, |lhs, rhs, _| {
+            let (_, flags) = arithmetic_result(lhs, rhs, i16::from(lhs) - i16::from(rhs), true);
+            (lhs, flags)
+        });
+    }
+
+    #[test]
+    fn inc_updates_znh_and_preserves_carry_for_all_inputs() {
+        check_unary(inc, |value, initial_flags| {
+            let (result, flags) = arithmetic_result(value, 1, i16::from(value) + 1, false);
+            (result, (flags & !0x10) | (initial_flags & 0x10))
+        });
+    }
+
+    #[test]
+    fn dec_updates_znh_and_preserves_carry_for_all_inputs() {
+        check_unary(dec, |value, initial_flags| {
+            let (result, flags) = arithmetic_result(value, 1, i16::from(value) - 1, true);
+            (result, (flags & !0x10) | (initial_flags & 0x10))
+        });
+    }
 
     #[test]
     fn add16_updates_carry_flags_clears_n_and_preserves_z() {
