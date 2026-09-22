@@ -1,6 +1,6 @@
-use crate::cpu::registers::*;
+use crate::cpu::flags::{CpuFlag, Flags};
 
-pub fn and(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn and(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let result = value1 & value2;
     flag_register.reset_flags();
     flag_register.set_flag(CpuFlag::Z, result == 0x00);
@@ -8,28 +8,28 @@ pub fn and(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     result
 }
 
-pub fn or(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn or(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let result = value1 | value2;
     flag_register.reset_flags();
     flag_register.set_flag(CpuFlag::Z, result == 0);
     result
 }
 
-pub fn xor(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn xor(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let result = value1 ^ value2;
     flag_register.reset_flags();
     flag_register.set_flag(CpuFlag::Z, result == 0);
     result
 }
 
-pub fn cpl(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn cpl(flag_register: &mut Flags, value: u8) -> u8 {
     let result = value ^ 0xFF;
     flag_register.set_flag(CpuFlag::N, true);
     flag_register.set_flag(CpuFlag::H, true);
     result
 }
 
-pub fn inc(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn inc(flag_register: &mut Flags, value: u8) -> u8 {
     let result = value.wrapping_add(1);
     flag_register.set_flag(CpuFlag::Z, result == 0);
     flag_register.set_flag(CpuFlag::N, false);
@@ -37,7 +37,7 @@ pub fn inc(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-pub fn dec(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn dec(flag_register: &mut Flags, value: u8) -> u8 {
     let result = value.wrapping_sub(1);
     flag_register.set_flag(CpuFlag::Z, result == 0);
     flag_register.set_flag(CpuFlag::N, true);
@@ -45,7 +45,7 @@ pub fn dec(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-pub fn add(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn add(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let result = value1.wrapping_add(value2);
     flag_register.set_flag(CpuFlag::Z, result == 0);
     flag_register.set_flag(CpuFlag::N, false);
@@ -57,7 +57,7 @@ pub fn add(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     result
 }
 
-pub fn add16(flag_register: &mut dyn FlagRegister, value1: u16, value2: u16) -> u16 {
+pub fn add16(flag_register: &mut Flags, value1: u16, value2: u16) -> u16 {
     let result = value1.wrapping_add(value2);
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, ((value1 & 0x0FFF) + (value2 & 0x0FFF)) > 0x0FFF);
@@ -65,7 +65,7 @@ pub fn add16(flag_register: &mut dyn FlagRegister, value1: u16, value2: u16) -> 
     result
 }
 
-pub fn adc(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn adc(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     //like add + carry flag
     let c: u8 = if flag_register.get_flag(CpuFlag::C) {
         1
@@ -83,7 +83,7 @@ pub fn adc(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     result
 }
 
-pub fn sub(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn sub(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let result = value1.wrapping_sub(value2);
     flag_register.set_flag(CpuFlag::Z, result == 0);
     flag_register.set_flag(CpuFlag::N, true);
@@ -92,7 +92,7 @@ pub fn sub(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     result
 }
 
-pub fn sbc(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn sbc(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     let c: u8 = if flag_register.get_flag(CpuFlag::C) {
         1
     } else {
@@ -106,22 +106,18 @@ pub fn sbc(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
     result
 }
 
-pub fn cp(flag_register: &mut dyn FlagRegister, value1: u8, value2: u8) -> u8 {
+pub fn cp(flag_register: &mut Flags, value1: u8, value2: u8) -> u8 {
     sub(flag_register, value1, value2);
     value1
 }
 
-pub fn swap(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn swap(flag_register: &mut Flags, value: u8) -> u8 {
     flag_register.reset_flags();
     flag_register.set_flag(CpuFlag::Z, value == 0);
     value.rotate_right(4)
 }
 
-pub fn add_next_signed_byte_to_word(
-    flag_register: &mut dyn FlagRegister,
-    value1: u16,
-    value2: u16,
-) -> u16 {
+pub fn add_next_signed_byte_to_word(flag_register: &mut Flags, value1: u16, value2: u16) -> u16 {
     flag_register.reset_flags();
 
     flag_register.set_flag(CpuFlag::H, (value1 & 0x000F) + (value2 & 0x000F) > 0x000F);
@@ -130,7 +126,7 @@ pub fn add_next_signed_byte_to_word(
     value1.wrapping_add(value2)
 }
 
-pub fn daa(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn daa(flag_register: &mut Flags, value: u8) -> u8 {
     //i got no idea what i'm doing
     let mut adjust = if flag_register.get_flag(CpuFlag::C) {
         0x60
@@ -158,24 +154,20 @@ pub fn daa(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-fn shift_operation_flag_update_without_z(
-    flag_register: &mut dyn FlagRegister,
-    _result: u8,
-    new_carry: bool,
-) {
+fn shift_operation_flag_update_without_z(flag_register: &mut Flags, _result: u8, new_carry: bool) {
     flag_register.reset_flags();
     flag_register.set_flag(CpuFlag::C, new_carry);
 }
 
-fn shift_operation_flag_update(flag_register: &mut dyn FlagRegister, result: u8, new_carry: bool) {
+fn shift_operation_flag_update(flag_register: &mut Flags, result: u8, new_carry: bool) {
     shift_operation_flag_update_without_z(flag_register, result, new_carry);
     flag_register.set_flag(CpuFlag::Z, result == 0);
 }
 
 fn rotate_left_through_carry(
-    flag_register: &mut dyn FlagRegister,
+    flag_register: &mut Flags,
     value: u8,
-    flag_update_function: fn(&mut dyn FlagRegister, u8, bool),
+    flag_update_function: fn(&mut Flags, u8, bool),
 ) -> u8 {
     let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
     let result = (value << 1)
@@ -188,21 +180,21 @@ fn rotate_left_through_carry(
     result
 }
 
-pub fn rl(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rl(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate left through carry
     rotate_left_through_carry(flag_register, value, shift_operation_flag_update)
 }
 
 //rla, rlca, rra and rrca don't set the Z flag - different to the CB instructions
-pub fn rla(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rla(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate left through carry
     rotate_left_through_carry(flag_register, value, shift_operation_flag_update_without_z)
 }
 
 fn rotate_left(
-    flag_register: &mut dyn FlagRegister,
+    flag_register: &mut Flags,
     value: u8,
-    flag_update_function: fn(&mut dyn FlagRegister, u8, bool),
+    flag_update_function: fn(&mut Flags, u8, bool),
 ) -> u8 {
     let new_carry = (value & 0x80) == 0x80; //left most bit that gets pushed out
     let result = (value << 1) | if new_carry { 0x01 } else { 0x00 }; //push one to the left and add the pushed out bit to the right
@@ -210,20 +202,20 @@ fn rotate_left(
     result
 }
 
-pub fn rlc(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rlc(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate left
     rotate_left(flag_register, value, shift_operation_flag_update)
 }
 
-pub fn rlca(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rlca(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate left
     rotate_left(flag_register, value, shift_operation_flag_update_without_z)
 }
 
 fn rotate_right_through_carry(
-    flag_register: &mut dyn FlagRegister,
+    flag_register: &mut Flags,
     value: u8,
-    flag_update_function: fn(&mut dyn FlagRegister, u8, bool),
+    flag_update_function: fn(&mut Flags, u8, bool),
 ) -> u8 {
     let new_carry = (value & 0x01) == 0x01;
     let result = (value >> 1)
@@ -236,20 +228,20 @@ fn rotate_right_through_carry(
     result
 }
 
-pub fn rr(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rr(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate right through carry
     rotate_right_through_carry(flag_register, value, shift_operation_flag_update)
 }
 
-pub fn rra(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rra(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate right through carry
     rotate_right_through_carry(flag_register, value, shift_operation_flag_update_without_z)
 }
 
 fn rotate_right(
-    flag_register: &mut dyn FlagRegister,
+    flag_register: &mut Flags,
     value: u8,
-    flag_update_function: fn(&mut dyn FlagRegister, u8, bool),
+    flag_update_function: fn(&mut Flags, u8, bool),
 ) -> u8 {
     let new_carry = (value & 0x01) == 0x01;
     let result = (value >> 1) | if new_carry { 0x80 } else { 0x00 };
@@ -257,18 +249,18 @@ fn rotate_right(
     result
 }
 
-pub fn rrc(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rrc(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate right
     rotate_right(flag_register, value, shift_operation_flag_update)
 }
 
-pub fn rrca(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn rrca(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate right
     rotate_right(flag_register, value, shift_operation_flag_update_without_z)
 }
 
 //difference between shift and rotate is, that we don't add the pushed out bit on the other side
-pub fn sla(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn sla(flag_register: &mut Flags, value: u8) -> u8 {
     //shift left arithmetic (b0=0)
     let new_carry = (value & 0x80) == 0x80;
     let result = value << 1;
@@ -276,7 +268,7 @@ pub fn sla(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-pub fn sra(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn sra(flag_register: &mut Flags, value: u8) -> u8 {
     //shift left arithmetic (b0=0)
     let new_carry = (value & 0x01) == 0x01;
     let result = (value >> 1) | (value & 0x80);
@@ -284,7 +276,7 @@ pub fn sra(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-pub fn srl(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
+pub fn srl(flag_register: &mut Flags, value: u8) -> u8 {
     //shift left arithmetic (b0=0)
     let new_carry = (value & 0x01) == 0x01;
     let result = value >> 1;
@@ -292,21 +284,21 @@ pub fn srl(flag_register: &mut dyn FlagRegister, value: u8) -> u8 {
     result
 }
 
-pub fn ccf(flag_register: &mut dyn FlagRegister) {
+pub fn ccf(flag_register: &mut Flags) {
     //compliment carry flag
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, false);
     flag_register.set_flag(CpuFlag::C, !flag_register.get_flag(CpuFlag::C));
 }
 
-pub fn scf(flag_register: &mut dyn FlagRegister) {
+pub fn scf(flag_register: &mut Flags) {
     //set carry flag
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, false);
     flag_register.set_flag(CpuFlag::C, true);
 }
 
-pub fn bit(flag_register: &mut dyn FlagRegister, bit: u8, value: u8) {
+pub fn bit(flag_register: &mut Flags, bit: u8, value: u8) {
     //check bit at
     flag_register.set_flag(CpuFlag::Z, (value & (1 << bit)) == 0);
     flag_register.set_flag(CpuFlag::N, false);
@@ -340,7 +332,7 @@ mod tests {
             for rhs in 0..=u8::MAX {
                 for flags in (0..=0xF0u8).step_by(0x10) {
                     registers.set_af(u16::from(lhs) << 8 | u16::from(flags));
-                    let result = operation(&mut registers, lhs, rhs);
+                    let result = operation(&mut registers.flags, lhs, rhs);
                     assert_eq!(
                         (result, registers.get_af() as u8),
                         expected(lhs, rhs, flags),
@@ -356,7 +348,7 @@ mod tests {
         for value in 0..=u8::MAX {
             for flags in (0..=0xF0u8).step_by(0x10) {
                 registers.set_af(u16::from(value) << 8 | u16::from(flags));
-                let result = operation(&mut registers, value);
+                let result = operation(&mut registers.flags, value);
                 assert_eq!(
                     (result, registers.get_af() as u8),
                     expected(value, flags),
@@ -438,7 +430,7 @@ mod tests {
                 let mut registers = Registers::new();
                 registers.set_af(initial_flags);
 
-                let result = add16(&mut registers, lhs, rhs);
+                let result = add16(&mut registers.flags, lhs, rhs);
 
                 assert_eq!(result, expected_result, "{lhs:04X} + {rhs:04X}");
                 assert_eq!(
@@ -545,7 +537,7 @@ mod tests {
             for value in 0..=u8::MAX {
                 for flags in (0..=0xF0u8).step_by(0x10) {
                     registers.set_af(u16::from(value) << 8 | u16::from(flags));
-                    bit(&mut registers, index, value);
+                    bit(&mut registers.flags, index, value);
                     let zero = (value >> index) & 1 == 0;
                     let expected = (u8::from(zero) << 7) | 0x20 | (flags & 0x10);
                     assert_eq!(
@@ -605,7 +597,7 @@ mod tests {
                             | (u8::from(!(0..100).contains(&decimal)) << 4);
                         for initial_z in [0, 0x80] {
                             registers.set_af(u16::from((flags & !0x80) | initial_z));
-                            let result = daa(&mut registers, input);
+                            let result = daa(&mut registers.flags, input);
                             assert_eq!((result, registers.get_af() as u8), (expected, expected_flags),
                                 "BCD {lhs}, {rhs}, carry={carry}, subtract={subtract}, Z={initial_z:02X}");
                         }
@@ -637,7 +629,7 @@ mod tests {
             let mut registers = Registers::new();
             registers.set_af(flags);
             assert_eq!(
-                (daa(&mut registers, value), registers.get_af() as u8),
+                (daa(&mut registers.flags, value), registers.get_af() as u8),
                 (expected, expected_flags),
                 "A={value:02X}, F={flags:02X}"
             );
@@ -658,7 +650,7 @@ mod tests {
                 let expected_flags = (((carries & 0x10) << 1) | ((carries & 0x100) >> 4)) as u8;
                 for flags in (0..=0xF0).step_by(0x10) {
                     registers.set_af(flags);
-                    let result = add_next_signed_byte_to_word(&mut registers, sp, operand);
+                    let result = add_next_signed_byte_to_word(&mut registers.flags, sp, operand);
                     assert_eq!(
                         (result, registers.get_af() as u8),
                         (expected, expected_flags),

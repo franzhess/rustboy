@@ -1,10 +1,4 @@
-#[derive(Debug, Copy, Clone)]
-pub enum CpuFlag {
-    Z = 0b1000_0000, //zero
-    N = 0b0100_0000, //subtract
-    H = 0b0010_0000, //half carry
-    C = 0b0001_0000, //carry
-}
+use super::flags::Flags;
 
 #[derive(Debug, Copy, Clone)]
 pub enum RegisterName8 {
@@ -28,7 +22,7 @@ pub enum RegisterName16 {
 #[derive(Debug, Copy, Clone)]
 pub struct Registers {
     pub a: u8,
-    f: u8,
+    pub flags: Flags,
     pub b: u8,
     pub c: u8,
     pub d: u8,
@@ -39,17 +33,11 @@ pub struct Registers {
     pub pc: u16,
 }
 
-pub trait FlagRegister {
-    fn get_flag(&self, cpu_flag: CpuFlag) -> bool;
-    fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool);
-    fn reset_flags(&mut self);
-}
-
 impl Registers {
     pub fn new() -> Registers {
         Registers {
             a: 0x01,
-            f: 0xB0,
+            flags: Flags::from_bits(0xB0),
             b: 0x00,
             c: 0x13,
             d: 0x00,
@@ -83,7 +71,7 @@ impl Registers {
     }
 
     pub fn get_af(&self) -> u16 {
-        (self.a as u16) << 8 | self.f as u16
+        (self.a as u16) << 8 | self.flags.bits() as u16
     }
 
     pub fn get_bc(&self) -> u16 {
@@ -126,7 +114,7 @@ impl Registers {
 
     pub fn set_af(&mut self, w: u16) {
         self.a = (w >> 8) as u8;
-        self.f = w as u8 & 0xF0; //only the upper 4 bits of f can be written to
+        self.flags = Flags::from_bits(w as u8);
     }
 
     pub fn set_bc(&mut self, w: u16) {
@@ -145,30 +133,19 @@ impl Registers {
     }
 }
 
-impl FlagRegister for Registers {
-    fn get_flag(&self, cpu_flag: CpuFlag) -> bool {
-        (self.f & cpu_flag as u8) > 0
-    }
-
-    fn set_flag(&mut self, cpu_flag: CpuFlag, value: bool) {
-        if value {
-            self.f |= cpu_flag as u8;
-        } else {
-            self.f &= !(cpu_flag as u8);
-        }
-
-        self.f &= 0xF0; // the lower bits are always 0
-    }
-
-    //if you have to clear more than one flag, this way is more efficient
-    fn reset_flags(&mut self) {
-        self.f = 0x00;
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn loading_af_masks_unused_flag_bits_and_preserves_the_accumulator() {
+        let mut registers = Registers::new();
+        for raw_flags in 0..=u8::MAX {
+            registers.set_af(0xA500 | u16::from(raw_flags));
+            assert_eq!(registers.a, 0xA5);
+            assert_eq!(registers.get_af(), 0xA500 | u16::from(raw_flags & 0xF0));
+        }
+    }
 
     #[test]
     fn wide_registers() {

@@ -1,4 +1,5 @@
 mod alu;
+mod flags;
 mod opcodes;
 mod opcodes_cb;
 mod registers;
@@ -6,7 +7,8 @@ mod registers;
 #[cfg(test)]
 mod timing_tests;
 
-use crate::cpu::registers::{FlagRegister, RegisterName16, RegisterName8, Registers};
+use crate::cpu::flags::Flags;
+use crate::cpu::registers::{RegisterName16, RegisterName8, Registers};
 use crate::mbc::Mbc;
 use crate::mmu::Mmu;
 use crate::ButtonEvent;
@@ -21,9 +23,9 @@ pub struct CpuStepResult {
     pub opcode: Option<u8>,
 }
 
-type UnaryOperation8 = fn(&mut dyn FlagRegister, u8) -> u8;
-type BinaryOperation8 = fn(&mut dyn FlagRegister, u8, u8) -> u8;
-type BinaryOperation16 = fn(&mut dyn FlagRegister, u16, u16) -> u16;
+type UnaryOperation8 = fn(&mut Flags, u8) -> u8;
+type BinaryOperation8 = fn(&mut Flags, u8, u8) -> u8;
+type BinaryOperation16 = fn(&mut Flags, u16, u16) -> u16;
 
 pub struct Cpu {
     registers: Registers,
@@ -224,13 +226,13 @@ impl Cpu {
 
     fn execute(&mut self, op: UnaryOperation8, arg: RegisterName8) {
         let value = self.registers.get(arg);
-        let result = op(&mut self.registers, value);
+        let result = op(&mut self.registers.flags, value);
         self.registers.set(arg, result);
     }
 
     fn execute_hl(&mut self, op: UnaryOperation8) {
         let original_value = self.mmu.read_byte(self.registers.get_hl());
-        let new_value = op(&mut self.registers, original_value);
+        let new_value = op(&mut self.registers.flags, original_value);
         self.mmu.write_byte(self.registers.get_hl(), new_value);
     }
 
@@ -241,14 +243,14 @@ impl Cpu {
 
     fn execute_binary_with_value(&mut self, op: BinaryOperation8, value2: u8) {
         let value1 = self.registers.a;
-        let result = op(&mut self.registers, value1, value2);
+        let result = op(&mut self.registers.flags, value1, value2);
         self.registers.a = result;
     }
 
     fn execute16(&mut self, op: BinaryOperation16, arg: RegisterName16) {
         let value1 = self.registers.get_hl();
         let value2 = self.registers.get16(arg);
-        let result = op(&mut self.registers, value1, value2);
+        let result = op(&mut self.registers.flags, value1, value2);
         self.registers.set_hl(result);
     }
 }
@@ -256,7 +258,7 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::{opcodes, Cpu};
-    use crate::cpu::registers::{CpuFlag, FlagRegister};
+    use crate::cpu::flags::CpuFlag;
     use crate::mbc::Mbc;
 
     struct TestMbc(Vec<u8>);
@@ -374,7 +376,7 @@ mod tests {
     fn not_taken_conditional_jump_wraps_while_skipping_its_operand() {
         let mut cpu = Cpu::new(Box::new(TestMbc(Vec::new())));
         cpu.registers.pc = 0xFFFF;
-        cpu.registers.set_flag(CpuFlag::Z, true);
+        cpu.registers.flags.set_flag(CpuFlag::Z, true);
 
         // PC already points to JR NZ's one-byte operand after its opcode was fetched.
         opcodes::execute(0x20, &mut cpu);

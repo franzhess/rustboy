@@ -265,322 +265,322 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
         } //SRL A
         0x40 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,B
         0x41 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,C
         0x42 => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,D
         0x43 => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,E
         0x44 => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,H
         0x45 => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,L
         0x46 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(12)
         } //BIT 0,(HL)
         0x47 => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 0, value);
+            alu::bit(&mut cpu.registers.flags, 0, value);
             Executed(8)
         } //BIT 0,A
         0x48 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,B
         0x49 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,C
         0x4A => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,D
         0x4B => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,E
         0x4C => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,H
         0x4D => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,L
         0x4E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(12)
         } //BIT 1,(HL)
         0x4F => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 1, value);
+            alu::bit(&mut cpu.registers.flags, 1, value);
             Executed(8)
         } //BIT 1,A
         0x50 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,B
         0x51 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,C
         0x52 => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,D
         0x53 => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,E
         0x54 => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,H
         0x55 => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,L
         0x56 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(12)
         } //BIT 2,(HL)
         0x57 => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 2, value);
+            alu::bit(&mut cpu.registers.flags, 2, value);
             Executed(8)
         } //BIT 2,A
         0x58 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,B
         0x59 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,C
         0x5A => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,D
         0x5B => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,E
         0x5C => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,H
         0x5D => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,L
         0x5E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(12)
         } //BIT 3,(HL)
         0x5F => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 3, value);
+            alu::bit(&mut cpu.registers.flags, 3, value);
             Executed(8)
         } //BIT 3,A
         0x60 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,B
         0x61 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,C
         0x62 => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,D
         0x63 => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,E
         0x64 => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,H
         0x65 => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,L
         0x66 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(12)
         } //BIT 4,(HL)
         0x67 => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 4, value);
+            alu::bit(&mut cpu.registers.flags, 4, value);
             Executed(8)
         } //BIT 4,A
         0x68 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,B
         0x69 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,C
         0x6A => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,D
         0x6B => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,E
         0x6C => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,H
         0x6D => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,L
         0x6E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(12)
         } //BIT 5,(HL)
         0x6F => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 5, value);
+            alu::bit(&mut cpu.registers.flags, 5, value);
             Executed(8)
         } //BIT 5,A
         0x70 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,B
         0x71 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,C
         0x72 => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,D
         0x73 => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,E
         0x74 => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,H
         0x75 => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,L
         0x76 => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(12)
         } //BIT 6,(HL)
         0x77 => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 6, value);
+            alu::bit(&mut cpu.registers.flags, 6, value);
             Executed(8)
         } //BIT 6,A
         0x78 => {
             let value = cpu.registers.b;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,B
         0x79 => {
             let value = cpu.registers.c;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,C
         0x7A => {
             let value = cpu.registers.d;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,D
         0x7B => {
             let value = cpu.registers.e;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,E
         0x7C => {
             let value = cpu.registers.h;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,H
         0x7D => {
             let value = cpu.registers.l;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,L
         0x7E => {
             let value = cpu.mmu.read_byte(cpu.registers.get_hl());
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(12)
         } //BIT 7,(HL)
         0x7F => {
             let value = cpu.registers.a;
-            alu::bit(&mut cpu.registers, 7, value);
+            alu::bit(&mut cpu.registers.flags, 7, value);
             Executed(8)
         } //BIT 7,A
         0x80 => {

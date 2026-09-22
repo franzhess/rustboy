@@ -10,7 +10,8 @@ It owns the MMU and drives devices using emulated cycles, not host time.
 | File | Responsibility |
 | --- | --- |
 | [`mod.rs`](mod.rs) | Step loop, fetch helpers, stack, interrupt dispatch, EI/HALT state |
-| [`registers.rs`](registers.rs) | Registers, flags, register-pair access, HL auto-increment/decrement |
+| [`registers.rs`](registers.rs) | Registers, register-pair access, HL auto-increment/decrement |
+| [`flags.rs`](flags.rs) | Concrete F-register storage and typed Z/N/H/C access |
 | [`alu.rs`](alu.rs) | Arithmetic/logic operations and their flag updates |
 | [`opcodes.rs`](opcodes.rs) | Base opcode dispatch and instruction durations |
 | [`opcodes_cb.rs`](opcodes_cb.rs) | CB-prefixed rotates, shifts, bit tests, resets, and sets |
@@ -29,8 +30,18 @@ It owns the MMU and drives devices using emulated cycles, not host time.
 
 Z means zero, N records subtraction, H records half-carry/borrow, and C records
 carry/borrow. Half-carry is relevant to nibble arithmetic and decimal adjustment;
-its boundary depends on the operation. Setting AF masks F with `0xF0` so POP AF
-cannot set nonexistent flag bits.
+its boundary depends on the operation.
+
+`Registers` owns a concrete `Flags` value. `Flags::from_bits` masks input with
+`0xF0`, and its private storage can only be changed through typed `CpuFlag`
+setters or a reset. The low nibble therefore remains zero, including when
+`Registers::set_af` loads F for POP AF. `Flags::bits()` exposes the masked byte
+for AF packing and register snapshots.
+
+ALU helpers and the CPU's operation function pointers take `&mut Flags`, giving
+operations access to F without borrowing the other registers. Flag reads and
+writes use concrete methods; there is no flag-register trait-object dispatch.
+Conditional branches read the same `registers.flags` value.
 
 `Registers::get16(&self, name)` reads BC, DE, HL or SP without requiring mutable
 access. `get_hl()` likewise reads the pair without changing it.
@@ -175,6 +186,8 @@ boundaries for `ADD HL,rr`. DAA is checked against decimal arithmetic for all va
 two-digit BCD operand pairs plus selected non-BCD cases. Signed SP-addition tests
 cover every signed offset at selected SP boundaries; instruction-level E8/F8 tests
 also verify sign extension, destinations, preserved A, PC and cycle totals.
+Dedicated flag tests cover all input bytes, per-flag updates and resets; register
+tests verify that loading AF masks the unused bits without altering A.
 
 Known remaining boundaries include reload-cycle TIMA/TMA write priority and IE
 changes during interrupt-entry stack writes, which need finer bus scheduling.

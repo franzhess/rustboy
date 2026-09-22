@@ -1,7 +1,7 @@
 use crate::cpu::alu;
+use crate::cpu::flags::CpuFlag;
 use crate::cpu::opcodes_cb;
-use crate::cpu::registers::CpuFlag;
-use crate::cpu::registers::{FlagRegister, RegisterName16, RegisterName8};
+use crate::cpu::registers::{RegisterName16, RegisterName8};
 use crate::cpu::Cpu;
 use crate::cpu::OpcodeResult;
 use crate::cpu::OpcodeResult::{Executed, UnknownOpcode};
@@ -138,7 +138,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(4)
         } //RRA
         0x20 => {
-            if !cpu.registers.get_flag(CpuFlag::Z) {
+            if !cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.jump_r();
                 Executed(12)
             } else {
@@ -177,7 +177,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(4)
         } //DAA
         0x28 => {
-            if cpu.registers.get_flag(CpuFlag::Z) {
+            if cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.jump_r();
                 Executed(12)
             } else {
@@ -214,7 +214,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(4)
         } //CPL - A=A XOR FF - method for flags
         0x30 => {
-            if !cpu.registers.get_flag(CpuFlag::C) {
+            if !cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.jump_r();
                 Executed(12)
             } else {
@@ -237,13 +237,13 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
         } //INC SP
         0x34 => {
             let address = cpu.registers.get_hl();
-            let inc_byte = alu::inc(&mut cpu.registers, cpu.mmu.read_byte(address));
+            let inc_byte = alu::inc(&mut cpu.registers.flags, cpu.mmu.read_byte(address));
             cpu.mmu.write_byte(address, inc_byte);
             Executed(12)
         } //INC (HL)
         0x35 => {
             let address = cpu.registers.get_hl();
-            let dec_byte = alu::dec(&mut cpu.registers, cpu.mmu.read_byte(address));
+            let dec_byte = alu::dec(&mut cpu.registers.flags, cpu.mmu.read_byte(address));
             cpu.mmu.write_byte(address, dec_byte);
             Executed(12)
         } //DEC (HL)
@@ -253,11 +253,11 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(12)
         } //LD (HL),n
         0x37 => {
-            alu::scf(&mut cpu.registers);
+            alu::scf(&mut cpu.registers.flags);
             Executed(4)
         } //SCF
         0x38 => {
-            if cpu.registers.get_flag(CpuFlag::C) {
+            if cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.jump_r();
                 Executed(12)
             } else {
@@ -290,7 +290,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(8)
         } //LD A,n
         0x3F => {
-            alu::ccf(&mut cpu.registers);
+            alu::ccf(&mut cpu.registers.flags);
             Executed(4)
         } //CCF - flip carry
         0x40 => Executed(4), //LD B,B
@@ -791,7 +791,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(4)
         } //CP A
         0xC0 => {
-            if !cpu.registers.get_flag(CpuFlag::Z) {
+            if !cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.return_from_call();
                 Executed(20)
             } else {
@@ -804,7 +804,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(12)
         } //POP BC
         0xC2 => {
-            if !cpu.registers.get_flag(CpuFlag::Z) {
+            if !cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
@@ -817,7 +817,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //JUMP nn
         0xC4 => {
-            if !cpu.registers.get_flag(CpuFlag::Z) {
+            if !cpu.registers.flags.get_flag(CpuFlag::Z) {
                 let address = cpu.fetch_word();
                 cpu.call(address);
                 Executed(24)
@@ -840,7 +840,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //RST 00H
         0xC8 => {
-            if cpu.registers.get_flag(CpuFlag::Z) {
+            if cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.return_from_call();
                 Executed(20)
             } else {
@@ -852,7 +852,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //RET
         0xCA => {
-            if cpu.registers.get_flag(CpuFlag::Z) {
+            if cpu.registers.flags.get_flag(CpuFlag::Z) {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
@@ -865,7 +865,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             opcodes_cb::execute(op, cpu)
         } //CB
         0xCC => {
-            if cpu.registers.get_flag(CpuFlag::Z) {
+            if cpu.registers.flags.get_flag(CpuFlag::Z) {
                 let address = cpu.fetch_word();
                 cpu.call(address);
                 Executed(24)
@@ -889,7 +889,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //RST 08H
         0xD0 => {
-            if !cpu.registers.get_flag(CpuFlag::C) {
+            if !cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.return_from_call();
                 Executed(20)
             } else {
@@ -902,7 +902,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(12)
         } //POP DE
         0xD2 => {
-            if !cpu.registers.get_flag(CpuFlag::C) {
+            if !cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
@@ -912,7 +912,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
         } //JP NC,nn
         //0xD3
         0xD4 => {
-            if !cpu.registers.get_flag(CpuFlag::C) {
+            if !cpu.registers.flags.get_flag(CpuFlag::C) {
                 let address = cpu.fetch_word();
                 cpu.call(address);
                 Executed(24)
@@ -935,7 +935,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //RST 10H
         0xD8 => {
-            if cpu.registers.get_flag(CpuFlag::C) {
+            if cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.return_from_call();
                 Executed(20)
             } else {
@@ -948,7 +948,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             Executed(16)
         } //RETI (return and enable interrupts)
         0xDA => {
-            if cpu.registers.get_flag(CpuFlag::C) {
+            if cpu.registers.flags.get_flag(CpuFlag::C) {
                 cpu.registers.pc = cpu.fetch_word();
                 Executed(16)
             } else {
@@ -958,7 +958,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
         } //JP C,nn
         //0xDB
         0xDC => {
-            if cpu.registers.get_flag(CpuFlag::C) {
+            if cpu.registers.flags.get_flag(CpuFlag::C) {
                 let address = cpu.fetch_word();
                 cpu.call(address);
                 Executed(24)
@@ -1011,7 +1011,7 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
             let value1 = cpu.registers.sp;
             let value2 = cpu.fetch_byte() as i8 as i16 as u16; //some rust magic that magic to add the u16 with wrapping add; i16 -> if i16 < 0 { u16 = u16.max - abs(i16) } and the sign is then done via the wrap around
             cpu.registers.sp =
-                alu::add_next_signed_byte_to_word(&mut cpu.registers, value1, value2);
+                alu::add_next_signed_byte_to_word(&mut cpu.registers.flags, value1, value2);
             Executed(16)
         } //ADD SP,r8
         0xE9 => {
@@ -1071,7 +1071,8 @@ pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
         0xF8 => {
             let value1 = cpu.registers.sp;
             let value2 = cpu.fetch_byte() as i8 as i16 as u16; //some rust magic that magic to add the u16 with wrapping add; i16 -> if i16 < 0 { u16 = u16.max - abs(i16) } and the sign is then done via the wrap around
-            let result = alu::add_next_signed_byte_to_word(&mut cpu.registers, value1, value2);
+            let result =
+                alu::add_next_signed_byte_to_word(&mut cpu.registers.flags, value1, value2);
             cpu.registers.set_hl(result);
             Executed(12)
         } //LD HL, SP+r8
