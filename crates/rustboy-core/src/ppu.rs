@@ -4,6 +4,16 @@ use crate::SCREEN_WIDTH;
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
 pub const VOAM_SIZE: usize = 0xA0;
 
+/// LCD modes, with discriminants matching STAT bits 0–1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum PpuMode {
+    HBlank = 0,
+    VBlank = 1,
+    OamSearch = 2,
+    PixelTransfer = 3,
+}
+
 pub struct Ppu {
     pub irq_vblank: bool,
     pub irq_stat: bool,
@@ -23,7 +33,7 @@ pub struct Ppu {
     sprite_size: usize,              //FF40 false = 8x8 / true = 8x16
     sprite_enable: bool,             //FF40
     bg_window_priority: bool,        //FF40
-    mode: u8,                        //Mode 0,1,2,3 FF41
+    mode: PpuMode,                   //FF41 bits 0–1
     irq_m0_enable: bool,             //sets what triggers the stat interrupt FF41
     irq_m1_enable: bool,
     irq_m2_enable: bool,
@@ -61,7 +71,7 @@ impl Ppu {
             sprite_size: 8,
             sprite_enable: false,
             bg_window_priority: true,
-            mode: 0x00,
+            mode: PpuMode::HBlank,
             irq_m0_enable: false,
             irq_m1_enable: false,
             irq_m2_enable: false,
@@ -118,7 +128,7 @@ impl Ppu {
                     } else {
                         0x00
                     })
-                    | self.mode
+                    | self.mode as u8
             }
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
@@ -207,73 +217,57 @@ impl Ppu {
                     self.irq_stat = self.line == self.line_compare;
                 }
 
-                if self.line >= 144 && self.mode != 1 {
-                    self.set_mode(1);
+                if self.line >= 144 && self.mode != PpuMode::VBlank {
+                    self.set_mode(PpuMode::VBlank);
                 }
             }
 
             if self.line < 144 {
                 if self.clock <= 80 {
-                    if self.mode != 2 {
-                        self.set_mode(2);
+                    if self.mode != PpuMode::OamSearch {
+                        self.set_mode(PpuMode::OamSearch);
                     }
                 } else if self.clock <= 80 + 172 {
-                    if self.mode != 3 {
-                        self.set_mode(3);
+                    if self.mode != PpuMode::PixelTransfer {
+                        self.set_mode(PpuMode::PixelTransfer);
                     }
                 } else {
-                    if self.mode != 0 {
-                        self.set_mode(0);
+                    if self.mode != PpuMode::HBlank {
+                        self.set_mode(PpuMode::HBlank);
                     }
                 }
             }
         } else {
-            //when the lcd is disabled line and mode are reset
+            // Reset directly: LCD disable does not run HBlank entry effects.
             self.line = 0;
-            self.mode = 0;
+            self.mode = PpuMode::HBlank;
         }
     }
 
-    /*
-     Mode 0: The LCD controller is in the H-Blank period and
-             the CPU can access both the display RAM (8000h-9FFFh)
-             and OAM (FE00h-FE9Fh)
-
-     Mode 1: The LCD controller is in the V-Blank period (or the
-             display is disabled) and the CPU can access both the
-             display RAM (8000h-9FFFh) and OAM (FE00h-FE9Fh)
-
-     Mode 2: The LCD controller is reading from OAM memory.
-             The CPU <cannot> access OAM memory (FE00h-FE9Fh)
-             during this period.
-
-     Mode 3: The LCD controller is reading from both OAM and VRAM,
-             The CPU <cannot> access OAM and VRAM during this period.
-             CGB Mode: Cannot access Palette Data (FF69,FF6B) either.
-    */
-    fn set_mode(&mut self, mode: u8) {
-        //println!("set mode: {}", mode);
+    /// Applies mode-entry rendering and interrupt effects. VRAM/OAM access
+    /// restrictions are not yet enforced by this simplified scanline model.
+    fn set_mode(&mut self, mode: PpuMode) {
         self.mode = mode;
 
         match mode {
-            1 => {
+            PpuMode::VBlank => {
                 if self.irq_m1_enable {
                     self.irq_stat = true;
                 };
                 self.irq_vblank = true;
                 self.frame = Some(self.get_screen_buffer());
-            } //we finished the screen, tell the window to refresh
-            2 => {
+            }
+            PpuMode::OamSearch => {
                 if self.irq_m2_enable {
                     self.irq_stat = true;
                 }
-            } //determine visible sprites
-            3 => self.render_line(), //draw the current line
-            _ => {
+            }
+            PpuMode::PixelTransfer => self.render_line(),
+            PpuMode::HBlank => {
                 if self.irq_m0_enable {
                     self.irq_stat = true;
                 }
-            } //in Mode 0 and 1 the PPU idles and the CPU can access the memmory
+            }
         }
     }
 
@@ -411,6 +405,99 @@ impl Ppu {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn stat_reports_modes_at_the_existing_scanline_thresholds() {
+        let mut ppu = Ppu::new();
+        assert_eq!(ppu.read_byte(0xFF41) & 3, 0);
+
+        // Characterize the current inclusive thresholds, not exact hardware edges.
+        for (ticks, expected_mode, expected_line) in [
+            (1, 2, 0),
+            (79, 2, 0),
+            (1, 3, 0),
+            (171, 3, 0),
+            (1, 0, 0),
+            (203, 2, 1),
+        ] {
+            ppu.do_ticks(ticks);
+            assert_eq!(ppu.read_byte(0xFF41) & 3, expected_mode);
+            assert_eq!(ppu.read_byte(0xFF44), expected_line);
+
+            // STAT writes can enable interrupts but cannot overwrite mode bits.
+            ppu.write_byte(0xFF41, 0xFF);
+            assert_eq!(ppu.read_byte(0xFF41) & 3, expected_mode);
+            assert_eq!(ppu.read_byte(0xFF41) & 0xF8, 0xF8);
+        }
+    }
+
+    #[test]
+    fn visible_mode_entries_request_only_the_enabled_stat_interrupt() {
+        for enables in [0, 0x08, 0x10, 0x20] {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF41, enables);
+            ppu.do_ticks(4); // OAM search
+            assert_eq!(ppu.irq_stat, enables == 0x20);
+            ppu.irq_stat = false;
+            ppu.do_ticks(4); // Same mode: no repeated request.
+            assert!(!ppu.irq_stat);
+            ppu.do_ticks(76); // Pixel transfer at clock 84.
+            assert!(!ppu.irq_stat);
+            ppu.do_ticks(172); // HBlank at clock 256.
+            assert_eq!(ppu.irq_stat, enables == 0x08);
+            ppu.irq_stat = false;
+            ppu.do_ticks(4);
+            assert!(!ppu.irq_stat);
+            assert!(!ppu.irq_vblank);
+            assert!(ppu.take_frame().is_none());
+        }
+    }
+
+    #[test]
+    fn vblank_entry_publishes_one_frame_and_requests_interrupts() {
+        for stat_enabled in [false, true] {
+            let mut ppu = Ppu::new();
+            ppu.write_byte(0xFF41, if stat_enabled { 0x10 } else { 0 });
+            for _ in 0..(144 * 456 / 4) {
+                ppu.do_ticks(4);
+            }
+            assert_eq!(ppu.read_byte(0xFF44), 144);
+            assert_eq!(ppu.read_byte(0xFF41) & 3, 1);
+            assert!(ppu.irq_vblank);
+            assert_eq!(ppu.irq_stat, stat_enabled);
+            assert_eq!(
+                ppu.take_frame().expect("completed frame").len(),
+                SCREEN_WIDTH * SCREEN_HEIGHT
+            );
+            ppu.irq_vblank = false;
+            ppu.irq_stat = false;
+
+            // Stay within VBlank: neither frames nor requests are repeated.
+            for _ in 0..(10 * 456 / 4 - 1) {
+                ppu.do_ticks(4);
+            }
+            assert_eq!(ppu.read_byte(0xFF41) & 3, 1);
+            assert!(ppu.take_frame().is_none());
+            assert!(!ppu.irq_vblank);
+            assert!(!ppu.irq_stat);
+            ppu.do_ticks(4);
+            assert_eq!((ppu.read_byte(0xFF44), ppu.read_byte(0xFF41) & 3), (0, 2));
+        }
+    }
+
+    #[test]
+    fn disabling_lcd_resets_line_and_mode_without_a_hblank_entry_interrupt() {
+        let mut ppu = Ppu::new();
+        ppu.do_ticks(456 + 84); // Line 1, pixel transfer.
+        assert_eq!((ppu.read_byte(0xFF44), ppu.read_byte(0xFF41) & 3), (1, 3));
+        ppu.write_byte(0xFF41, 0x08);
+        ppu.write_byte(0xFF40, 0);
+        ppu.do_ticks(4);
+        assert_eq!((ppu.read_byte(0xFF44), ppu.read_byte(0xFF41) & 3), (0, 0));
+        assert!(!ppu.irq_stat);
+        assert!(!ppu.irq_vblank);
+        assert!(ppu.take_frame().is_none());
+    }
 
     #[test]
     fn sprite_rows_to_color_values() {

@@ -126,12 +126,28 @@ buffer retains background indices for sprite/background priority checks.
 The nominal frame schedule is 456 T-cycles per line, with 144 visible lines and
 10 VBlank lines: `456 × 154 = 70,224` T-cycles, approximately 59.73 frames/second.
 
-| LCD mode | Nominal role in the current simplified schedule |
-| --- | --- |
-| 2 | OAM search, first 80 T-cycles of a visible line |
-| 3 | Pixel transfer, next 172 T-cycles; the implementation renders the whole line on entry |
-| 0 | HBlank, remaining 204 T-cycles |
-| 1 | VBlank, lines 144–153; entering it publishes a frame and requests VBlank |
+| STAT mode bits | `PpuMode` | Nominal role in the current simplified schedule |
+| --- | --- | --- |
+| 2 | `OamSearch` | OAM search, first 80 T-cycles of a visible line |
+| 3 | `PixelTransfer` | Pixel transfer, next 172 T-cycles; the implementation renders the whole line on entry |
+| 0 | `HBlank` | HBlank, remaining 204 T-cycles |
+| 1 | `VBlank` | VBlank, lines 144–153; entering it publishes a frame and requests VBlank |
+
+The mode is stored as a `PpuMode` enum, whose explicit discriminants encode STAT
+bits 0–1. STAT writes only change interrupt enables, not the current mode. Mode-entry
+effects use an exhaustive match: OAM search and HBlank request STAT when enabled;
+pixel transfer renders a line; VBlank publishes a frame, requests VBlank, and
+requests STAT if its mode-1 enable is set.
+
+The current initial mode is HBlank even though LCDC starts enabled. Disabling the
+LCD resets LY and the mode to HBlank on the next device tick, without running
+HBlank entry effects. The existing clock comparisons remain inclusive: visible
+line clocks `<= 80` select OAM search, `81–252` select pixel transfer, and `253–455`
+select HBlank. These are implementation thresholds rather than cycle-exact hardware
+edges. Regression tests preserve these thresholds, STAT encoding, interrupt requests,
+single-frame publication at VBlank entry, and the LCD-disable reset behavior.
+
+Run the PPU tests with `cargo test -p rustboy-core ppu::`.
 
 Mode selection is evaluated at step boundaries using fixed thresholds, not a pixel
 FIFO. Sprite/scroll-dependent transfer durations and exact STAT edge behavior are
