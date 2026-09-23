@@ -114,19 +114,16 @@ impl Mmu {
     }
 
     pub fn process_irq_requests(&mut self) {
-        if self.ppu.irq_vblank {
+        if self.ppu.take_vblank_interrupt() {
             self.interrupt_request |= 0x01;
-            self.ppu.irq_vblank = false;
         }
 
-        if self.ppu.irq_stat {
+        if self.ppu.take_stat_interrupt() {
             self.interrupt_request |= 0x02;
-            self.ppu.irq_stat = false;
         }
 
-        if self.timer.irq_timer {
+        if self.timer.take_interrupt() {
             self.interrupt_request |= 0x04;
-            self.timer.irq_timer = false;
         }
 
         //@TODO add joypad and serial interrupts
@@ -184,6 +181,61 @@ mod tests {
         assert_eq!(mmu.read_byte(0xFF0F), 0xFF);
         mmu.write_byte(0xFF0F, 0x00);
         assert_eq!(mmu.read_byte(0xFF0F), 0xE0);
+    }
+
+    #[test]
+    fn device_requests_map_to_if_once_and_preserve_other_pending_bits() {
+        for expected_bit in [0x01, 0x02, 0x04] {
+            let mut mmu = Mmu::new(Box::new(TestMbc));
+            mmu.write_byte(0xFFFF, 0); // Collection must not depend on IE.
+            mmu.write_byte(0xFF0F, 0x18); // Existing serial/joypad requests.
+            match expected_bit {
+                0x01 => mmu.do_ticks(144 * 456), // VBlank, STAT disabled.
+                0x02 => {
+                    mmu.write_byte(0xFF41, 0x20); // OAM-search STAT only.
+                    mmu.do_ticks(4);
+                }
+                _ => {
+                    mmu.write_byte(0xFF40, 0); // Isolate the timer.
+                    mmu.write_byte(0xFF05, 0xFF);
+                    mmu.write_byte(0xFF07, 0x05);
+                    mmu.do_ticks(20); // Overflow, then reload four cycles later.
+                }
+            }
+            mmu.do_ticks(4); // Requests remain pending until collection.
+            assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x18);
+
+            mmu.process_irq_requests();
+            assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x18 | expected_bit);
+            mmu.process_irq_requests();
+            assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x18 | expected_bit);
+
+            // Acknowledging IF must not cause the already-collected device
+            // request to be delivered a second time.
+            mmu.write_byte(0xFF0F, 0x18);
+            mmu.process_irq_requests();
+            assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x18);
+        }
+    }
+
+    #[test]
+    fn simultaneous_ppu_and_timer_requests_are_all_collected_and_consumed() {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+        mmu.write_byte(0xFF41, 0x10); // VBlank STAT enable.
+        mmu.do_ticks(144 * 456 - 20);
+        mmu.write_byte(0xFF04, 0);
+        mmu.write_byte(0xFF05, 0xFF);
+        mmu.write_byte(0xFF07, 0x05);
+        mmu.write_byte(0xFF0F, 0x18);
+        mmu.do_ticks(20); // VBlank/STAT entry and TIMA reload in the same batch.
+        mmu.do_ticks(4);
+
+        assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x18);
+        mmu.process_irq_requests();
+        assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0x1F);
+        mmu.write_byte(0xFF0F, 0);
+        mmu.process_irq_requests();
+        assert_eq!(mmu.read_byte(0xFF0F) & 0x1F, 0);
     }
 
     #[test]

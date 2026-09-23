@@ -1,9 +1,9 @@
 use crate::{Button, ButtonEvent, ButtonState};
 
 pub struct Joypad {
-    pub irq_joypad: bool, //interrupt is true when input has changed
-    state: [bool; 8],     //the state of the 8 buttons
-    selector: bool,       //true = buttons, false = directions
+    irq_joypad: bool, //interrupt is true when input has changed
+    state: [bool; 8], //the state of the 8 buttons
+    selector: bool,   //true = buttons, false = directions
 }
 
 impl Joypad {

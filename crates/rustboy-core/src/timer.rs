@@ -1,5 +1,5 @@
 pub struct Timer {
-    pub irq_timer: bool,
+    irq_timer: bool,
 
     divider: u16,
 
@@ -93,6 +93,11 @@ impl Timer {
             self.divider = self.divider.wrapping_add(1);
             self.increment_on_falling_edge(previous_signal);
         }
+    }
+
+    /// Consumes the pending reload interrupt without changing timer registers.
+    pub fn take_interrupt(&mut self) -> bool {
+        std::mem::take(&mut self.irq_timer)
     }
 
     fn timer_signal(&self) -> bool {
@@ -201,15 +206,15 @@ mod tests {
 
         timer.do_ticks(16);
         assert_eq!(timer.read_byte(0xFF05), 0);
-        assert!(!timer.irq_timer);
+        assert!(!timer.take_interrupt());
 
         timer.do_ticks(3);
         assert_eq!(timer.read_byte(0xFF05), 0);
-        assert!(!timer.irq_timer);
+        assert!(!timer.take_interrupt());
 
         timer.do_ticks(1);
         assert_eq!(timer.read_byte(0xFF05), 0xAB);
-        assert!(timer.irq_timer);
+        assert!(timer.take_interrupt());
     }
 
     #[test]
@@ -221,7 +226,7 @@ mod tests {
         timer.do_ticks(4);
 
         assert_eq!(timer.read_byte(0xFF05), 0x42);
-        assert!(!timer.irq_timer);
+        assert!(!timer.take_interrupt());
     }
 
     #[test]
@@ -234,7 +239,7 @@ mod tests {
         timer.do_ticks(4);
 
         assert_eq!(timer.read_byte(0xFF05), 0xCD);
-        assert!(timer.irq_timer);
+        assert!(timer.take_interrupt());
     }
 
     #[test]
@@ -246,7 +251,7 @@ mod tests {
         timer.do_ticks(32);
 
         assert_eq!(timer.read_byte(0xFF05), 0xAC);
-        assert!(timer.irq_timer);
+        assert!(timer.take_interrupt());
     }
 
     #[test]
@@ -259,15 +264,15 @@ mod tests {
             // Reset DIV, select a low divider bit, or disable the timer while high.
             timer.write_byte(address, value);
             assert_eq!(timer.read_byte(0xFF05), 0);
-            assert!(!timer.irq_timer);
+            assert!(!timer.take_interrupt());
 
             timer.do_ticks(3);
             assert_eq!(timer.read_byte(0xFF05), 0);
-            assert!(!timer.irq_timer);
+            assert!(!timer.take_interrupt());
 
             timer.do_ticks(1);
             assert_eq!(timer.read_byte(0xFF05), 0xAB);
-            assert!(timer.irq_timer);
+            assert!(timer.take_interrupt());
         }
     }
 
@@ -280,10 +285,31 @@ mod tests {
         timer.write_byte(0xFF07, 0);
         timer.do_ticks(3);
         assert_eq!(timer.read_byte(0xFF05), 0);
-        assert!(!timer.irq_timer);
+        assert!(!timer.take_interrupt());
 
         timer.do_ticks(1);
         assert_eq!(timer.read_byte(0xFF05), 0xAB);
-        assert!(timer.irq_timer);
+        assert!(timer.take_interrupt());
+    }
+
+    #[test]
+    fn interrupt_survives_register_writes_and_can_be_consumed_then_requested_again() {
+        let mut timer = timer_about_to_overflow();
+        assert!(!timer.take_interrupt());
+        timer.do_ticks(20);
+        timer.write_byte(0xFF07, 0); // Disable after the reload has requested IRQ.
+        timer.do_ticks(64);
+        timer.write_byte(0xFF05, 0xA5);
+
+        assert!(timer.take_interrupt());
+        assert!(!timer.take_interrupt());
+        assert_eq!(timer.read_byte(0xFF05), 0xA5);
+
+        timer.write_byte(0xFF04, 0);
+        timer.write_byte(0xFF05, 0xFF);
+        timer.write_byte(0xFF07, 0x05);
+        timer.do_ticks(20);
+        assert!(timer.take_interrupt());
+        assert!(!timer.take_interrupt());
     }
 }

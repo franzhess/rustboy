@@ -90,8 +90,26 @@ hardware open-bus/unimplemented-register model. Work RAM has a larger backing ar
 than the 8 KiB exposed by the DMG map; that does not implement CGB RAM banking.
 
 Word accesses are little-endian and wrap the second byte from `FFFF` to `0000`.
-`process_irq_requests` collects PPU VBlank/STAT and timer requests into IF, then
-clears the local request flags. Serial and joypad request forwarding is still TODO.
+`process_irq_requests` collects device requests into IF at the start of a CPU
+step. The request flags are private to their devices; the MMU consumes them through:
+
+| Device method | IF bit |
+| --- | --- |
+| `Ppu::take_vblank_interrupt()` | 0: VBlank |
+| `Ppu::take_stat_interrupt()` | 1: LCD STAT |
+| `Timer::take_interrupt()` | 2: Timer |
+
+Each method returns the current request and clears only that device-local flag.
+Repeated collection without a new request does not reassert an acknowledged IF
+bit. The MMU ORs requests into IF, preserving other pending bits even when IE is
+zero. Consuming a device request is separate from acknowledging IF: IF remains set
+until interrupt service or a software write clears it. Frame delivery and timer
+registers are independent of request consumption.
+
+Request generation and collection timing are unchanged, including the PPU's
+simplified mode/LYC logic. Serial and joypad request forwarding is still TODO.
+MMU tests cover individual bit mapping, simultaneous requests and acknowledgement;
+device tests exercise consuming requests and raising subsequent ones.
 
 ### OAM DMA
 

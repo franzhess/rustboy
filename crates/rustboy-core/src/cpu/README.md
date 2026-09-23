@@ -236,6 +236,11 @@ do not establish correct ordering of bus reads/writes within an instruction.
 The CPU checks `IE & IF & 0x1F`. IE is at `FFFF`, IF at `FF0F`; IME is a separate
 internal master-enable flag, not a bit in either register.
 
+Before this check, the MMU consumes the PPU's VBlank/STAT requests and the timer's
+request through their `take_*` methods and ORs them into IF. Collection is independent
+of IE and IME. Device-local flags are private; consuming them does not acknowledge
+IF, so other pending requests survive until serviced or cleared by software.
+
 | Bit | Interrupt | Vector |
 | --- | --- | --- |
 | 0 | VBlank | `0040` |

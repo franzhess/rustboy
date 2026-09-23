@@ -15,8 +15,8 @@ enum PpuMode {
 }
 
 pub struct Ppu {
-    pub irq_vblank: bool,
-    pub irq_stat: bool,
+    irq_vblank: bool,
+    irq_stat: bool,
 
     screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
     color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
@@ -195,6 +195,16 @@ impl Ppu {
 
     pub fn take_frame(&mut self) -> Option<Vec<u8>> {
         self.frame.take()
+    }
+
+    /// Consumes the current VBlank request without affecting STAT or frame delivery.
+    pub fn take_vblank_interrupt(&mut self) -> bool {
+        std::mem::take(&mut self.irq_vblank)
+    }
+
+    /// Consumes the current STAT request without affecting VBlank or frame delivery.
+    pub fn take_stat_interrupt(&mut self) -> bool {
+        std::mem::take(&mut self.irq_stat)
     }
 
     /* timing
@@ -437,18 +447,16 @@ mod test {
             let mut ppu = Ppu::new();
             ppu.write_byte(0xFF41, enables);
             ppu.do_ticks(4); // OAM search
-            assert_eq!(ppu.irq_stat, enables == 0x20);
-            ppu.irq_stat = false;
+            assert_eq!(ppu.take_stat_interrupt(), enables == 0x20);
             ppu.do_ticks(4); // Same mode: no repeated request.
-            assert!(!ppu.irq_stat);
+            assert!(!ppu.take_stat_interrupt());
             ppu.do_ticks(76); // Pixel transfer at clock 84.
-            assert!(!ppu.irq_stat);
+            assert!(!ppu.take_stat_interrupt());
             ppu.do_ticks(172); // HBlank at clock 256.
-            assert_eq!(ppu.irq_stat, enables == 0x08);
-            ppu.irq_stat = false;
+            assert_eq!(ppu.take_stat_interrupt(), enables == 0x08);
             ppu.do_ticks(4);
-            assert!(!ppu.irq_stat);
-            assert!(!ppu.irq_vblank);
+            assert!(!ppu.take_stat_interrupt());
+            assert!(!ppu.take_vblank_interrupt());
             assert!(ppu.take_frame().is_none());
         }
     }
@@ -463,14 +471,14 @@ mod test {
             }
             assert_eq!(ppu.read_byte(0xFF44), 144);
             assert_eq!(ppu.read_byte(0xFF41) & 3, 1);
-            assert!(ppu.irq_vblank);
-            assert_eq!(ppu.irq_stat, stat_enabled);
+            assert!(ppu.take_vblank_interrupt());
+            assert!(!ppu.take_vblank_interrupt());
+            assert_eq!(ppu.take_stat_interrupt(), stat_enabled);
+            assert!(!ppu.take_stat_interrupt());
             assert_eq!(
                 ppu.take_frame().expect("completed frame").len(),
                 SCREEN_WIDTH * SCREEN_HEIGHT
             );
-            ppu.irq_vblank = false;
-            ppu.irq_stat = false;
 
             // Stay within VBlank: neither frames nor requests are repeated.
             for _ in 0..(10 * 456 / 4 - 1) {
@@ -478,8 +486,8 @@ mod test {
             }
             assert_eq!(ppu.read_byte(0xFF41) & 3, 1);
             assert!(ppu.take_frame().is_none());
-            assert!(!ppu.irq_vblank);
-            assert!(!ppu.irq_stat);
+            assert!(!ppu.take_vblank_interrupt());
+            assert!(!ppu.take_stat_interrupt());
             ppu.do_ticks(4);
             assert_eq!((ppu.read_byte(0xFF44), ppu.read_byte(0xFF41) & 3), (0, 2));
         }
@@ -494,8 +502,8 @@ mod test {
         ppu.write_byte(0xFF40, 0);
         ppu.do_ticks(4);
         assert_eq!((ppu.read_byte(0xFF44), ppu.read_byte(0xFF41) & 3), (0, 0));
-        assert!(!ppu.irq_stat);
-        assert!(!ppu.irq_vblank);
+        assert!(!ppu.take_stat_interrupt());
+        assert!(!ppu.take_vblank_interrupt());
         assert!(ppu.take_frame().is_none());
     }
 
