@@ -13,6 +13,7 @@ pub enum RegisterName8 {
 
 #[derive(Debug, Copy, Clone)]
 pub enum RegisterName16 {
+    AF,
     BC,
     DE,
     HL,
@@ -63,10 +64,21 @@ impl Registers {
 
     pub fn get16(&self, name: RegisterName16) -> u16 {
         match name {
+            RegisterName16::AF => self.get_af(),
             RegisterName16::BC => self.get_bc(),
             RegisterName16::DE => self.get_de(),
             RegisterName16::HL => self.get_hl(),
             RegisterName16::SP => self.sp,
+        }
+    }
+
+    pub fn set16(&mut self, name: RegisterName16, value: u16) {
+        match name {
+            RegisterName16::AF => self.set_af(value),
+            RegisterName16::BC => self.set_bc(value),
+            RegisterName16::DE => self.set_de(value),
+            RegisterName16::HL => self.set_hl(value),
+            RegisterName16::SP => self.sp = value,
         }
     }
 
