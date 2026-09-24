@@ -44,3 +44,18 @@ A failure returns immediately: polling failures prevent input draining and machi
 advancement; output failures stop further stepping/delivery in that call. Already
 completed machine steps and delivered output are not rolled back. Tests inject
 failures for each operation without opening devices or relying on host sleeps.
+
+## CPU diagnostics
+
+`Session::step` returns the core's `StepResult`, including its optional
+`CpuDiagnostic`. `advance_frame` takes a mutable diagnostic callback;
+`run` takes a `FnMut(CpuDiagnostic)` callback and forwards it through each frame
+advance. Events are delivered before that step's video/audio output, so a later
+output failure cannot hide an already encountered CPU diagnostic.
+
+The frontend decides how to report or record an event. A caller intentionally
+ignoring diagnostics can pass `|_| {}` to `run`, or `&mut |_| {}` to `advance_frame`.
+Diagnostics are distinct from `RunError`: reporting an illegal opcode does not
+itself abort the run loop. The machine enters its explicit illegal-opcode state
+and continues the existing idle/device advancement behavior. Call
+`session.machine().cpu_state()` to inspect the current CPU state.

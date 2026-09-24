@@ -21,3 +21,7 @@ Platform initialization failures retain their typed SDL causes. Audio startup an
 shutdown failures are reported with `Could not start audio:` and `Could not stop
 audio:` respectively. Runtime failures are reported as `Emulator stopped:` followed
 by the application's input/frame/audio operation context and underlying error.
+
+The CLI also supplies the run loop's CPU-diagnostic callback. It prints illegal
+opcode events to stderr with the opcode byte and fetch address. These are one-shot
+events per encounter, not repeated messages on every idle step.

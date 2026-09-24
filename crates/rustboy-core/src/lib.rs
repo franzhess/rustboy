@@ -12,7 +12,7 @@ pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 pub const AUDIO_OUTPUT_FREQUENCY: usize = 48_000;
 
-pub use cpu::RegisterValues;
+pub use cpu::{CpuDiagnostic, CpuState, RegisterValues};
 
 use crate::cpu::Cpu;
 use crate::mbc::Cartridge;
@@ -43,8 +43,10 @@ pub struct ButtonEvent {
 
 pub struct StepResult {
     pub cycles: usize,
-    /// The opcode executed by this step; absent during interrupt entry or HALT idle.
+    /// The opcode fetched for execution; absent during interrupt entry or any idle step.
     pub opcode: Option<u8>,
+    /// A diagnostic from this step, emitted once per encounter rather than during idle.
+    pub diagnostic: Option<CpuDiagnostic>,
     pub frame: Option<Vec<u8>>,
     pub audio_buffers: Vec<Vec<i16>>,
 }
@@ -65,6 +67,7 @@ impl Machine {
         StepResult {
             cycles: result.cycles,
             opcode: result.opcode,
+            diagnostic: result.diagnostic,
             frame: self.cpu.take_frame(),
             audio_buffers: self.cpu.take_audio_buffers(),
         }
@@ -86,11 +89,38 @@ impl Machine {
     pub fn registers(&self) -> RegisterValues {
         self.cpu.registers()
     }
+
+    pub fn cpu_state(&self) -> CpuState {
+        self.cpu.state()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn machine_exposes_cpu_state_and_one_shot_structured_diagnostics() {
+        let mut rom = vec![0; 0x148];
+        rom[0x100] = 0xD3;
+        let mut machine = Machine::new(Cartridge::from_bytes(rom).expect("valid ROM"));
+        assert_eq!(machine.cpu_state(), CpuState::Running);
+        assert_eq!(machine.next_opcode(), Some(0xD3));
+
+        let result = machine.step();
+        let diagnostic = CpuDiagnostic::IllegalOpcode {
+            address: 0x100,
+            opcode: 0xD3,
+        };
+        assert_eq!(result.diagnostic, Some(diagnostic));
+        assert_eq!(diagnostic.to_string(), "Illegal opcode 0xD3 at 0x0100");
+        assert_eq!((result.cycles, result.opcode), (4, Some(0xD3)));
+        assert_eq!(machine.cpu_state(), CpuState::IllegalOpcode);
+        assert_eq!(machine.next_opcode(), None);
+
+        let idle = machine.step();
+        assert_eq!((idle.cycles, idle.opcode, idle.diagnostic), (4, None, None));
+    }
 
     #[test]
     fn cartridge_can_wait_for_vblank_before_initializing_the_lcd() {

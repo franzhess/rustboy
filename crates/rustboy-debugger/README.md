@@ -16,3 +16,7 @@ Debugging is not part of Game Boy hardware. The core should execute instructions
 - Disassembly coordination using the instruction information returned by core stepping.
 
 The synchronous `Machine::step` API is the foundation for these features. The terminal interface will live in `rustboy-adapter-debugger-cli`.
+
+The current facade re-exports `CpuState` and `CpuDiagnostic` alongside `Machine`,
+`RegisterValues` and `StepResult`. A debugger can inspect `Machine::cpu_state()`
+and record the optional diagnostic from each step without scraping terminal output.

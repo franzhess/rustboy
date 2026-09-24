@@ -12,6 +12,7 @@ It owns the MMU and drives devices using emulated cycles, not host time.
 | [`mod.rs`](mod.rs) | Step loop, fetch helpers, stack, interrupt dispatch, EI/HALT state |
 | [`registers.rs`](registers.rs) | Registers, register-pair access, HL auto-increment/decrement |
 | [`flags.rs`](flags.rs) | Concrete F-register storage and typed Z/N/H/C access |
+| [`state.rs`](state.rs) | Execution-state enum and structured CPU diagnostics |
 | [`alu.rs`](alu.rs) | Arithmetic/logic operations and their flag updates |
 | [`opcodes.rs`](opcodes.rs) | Grouped base and CB-prefixed dispatch, shared decoding helpers, and instruction durations |
 | [`operand.rs`](operand.rs) | Shared 8-bit register/indirect-HL operand decoding and access |
@@ -65,20 +66,40 @@ emulated boot ROM or a guarantee of exact DMG post-boot state. IME starts clear.
 
 1. Collect device interrupt requests and check whether interrupt entry is needed.
 2. If an interrupt is serviced, perform entry without executing a handler instruction.
-3. Otherwise, execute one instruction when awake, or consume a HALT idle step.
+3. Otherwise, execute one instruction when running, or consume an idle step.
 4. Complete pending EI-delay bookkeeping after an executed instruction.
 5. Advance the MMU's timer, PPU, and APU by the step's total T-cycles.
 
 The opcode handlers return `OpcodeResult::Executed(t_cycles)` or
 `OpcodeResult::UnknownOpcode`. The public machine returns the executed **base**
 opcode; CB instructions report `0xCB`.
-Interrupt entry and HALT idle return no opcode. An awake `next_opcode()` peek can
+Interrupt entry and all idle states return no opcode. An awake `next_opcode()` peek can
 be superseded by an interrupt and must not be used as an execution trace.
 
 All legal opcode encodings are dispatched. The eleven illegal base encodings
-return `UnknownOpcode`; the step loop currently prints a diagnostic, enters its
-halted state, and consumes four cycles. This fallback does not model hardware
-illegal-opcode lockup semantics.
+return `UnknownOpcode`; the step loop enters `CpuState::IllegalOpcode`, consumes
+four cycles and returns `CpuDiagnostic::IllegalOpcode { address, opcode }`. The
+address is captured before the fetch, including when PC wraps. The encounter step
+still reports `Some(opcode)`; later idle steps report neither opcode nor diagnostic.
+The CLI and ROM runner own diagnostic output rather than the CPU.
+
+### Execution states
+
+| `CpuState` | Entry | Current stepping behavior |
+| --- | --- | --- |
+| `Running` | Construction or wake-up | Execute instructions or service interrupts |
+| `Halted` | HALT without the HALT-bug condition | Idle for 4 T-cycles until an enabled request |
+| `Stopped` | STOP, after consuming its padding byte | Currently the same idle/wake behavior as HALT |
+| `IllegalOpcode` | An illegal base opcode | Currently the same idle/wake behavior as HALT, with a one-shot diagnostic |
+
+`Machine::cpu_state()` exposes these states. IME, pending EI enable and HALT-bug
+fetch suppression remain separate controls. In particular, HALT with the bug
+condition leaves the state `Running` and sets fetch suppression.
+
+All current idle states keep advancing devices. On an enabled pending request,
+IME set leads to interrupt entry; IME clear resumes normal execution. Retaining
+that behavior makes this a structural refactor. STOP's hardware power/wake rules
+and permanent illegal-opcode lockup require separately tested behavior changes.
 
 ## Opcode fields and groups
 
@@ -276,8 +297,8 @@ a multi-byte instruction can consume its opcode again as its first operand.
 
 EI followed by HALT with a request already pending has special handling: interrupt
 entry saves the HALT address and clears fetch suppression before running the
-handler. STOP currently consumes its padding byte and reuses the halted state;
-its distinct low-power/input-resume behavior is not implemented.
+handler. STOP consumes its padding byte and enters `Stopped`; its distinct
+low-power/input-resume behavior is not implemented yet.
 
 ## Tests and current boundaries
 

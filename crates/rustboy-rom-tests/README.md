@@ -33,4 +33,8 @@ The stepping helpers propagate that type; output delivery cannot produce a runne
 failure. ROM loading errors, assertion failures, timeouts and captured core panics
 remain separate outcomes.
 
+The runner reports `StepResult::diagnostic` events to stderr. An illegal opcode
+diagnostic does not change trial classification or exit-opcode detection: the
+runner still uses the step's opcode and the existing cycle deadline/assertions.
+
 Only eligible DMG tests with machine-readable memory or register expectations are registered. CGB/SGB, screenshot-only, and unsupported cartridge tests remain outside current emulator support. A failing ROM is useful evidence of a missing or inaccurate hardware behavior and is a natural starting point for the future debugger.

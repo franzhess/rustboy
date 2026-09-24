@@ -3,4 +3,4 @@
 //! The crate deliberately depends only on `rustboy-core`; terminal and graphical
 //! user interfaces belong in debugger adapter crates.
 
-pub use rustboy_core::{Machine, RegisterValues, StepResult};
+pub use rustboy_core::{CpuDiagnostic, CpuState, Machine, RegisterValues, StepResult};

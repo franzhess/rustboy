@@ -1,4 +1,4 @@
-use super::{tests::cpu_with_program, Cpu};
+use super::{tests::cpu_with_program, Cpu, CpuState};
 
 const MEMORY: u16 = 0xC080;
 
@@ -482,7 +482,7 @@ fn unconditional_control_flow_and_stop_keep_their_special_semantics() {
     cpu.mmu.write_byte(0xC200, 0x10);
     cpu.mmu.write_byte(0xC201, 0);
     step(&mut cpu, 0x10, 4, 0xC202);
-    assert!(cpu.halted);
+    assert_eq!(cpu.state, CpuState::Stopped);
     assert_eq!(cpu.registers.flags.bits(), 0xF0);
 }
 
@@ -494,6 +494,13 @@ fn halt_is_not_a_memory_load_and_alu_memory_sources_are_read_only() {
         cpu.mmu.do_ticks(256);
         step(&mut cpu, opcode, if opcode == 0x76 { 4 } else { 8 }, 0x101);
         assert_eq!(cpu.mmu.read_byte(0xFF04), 1, "opcode={opcode:02X}");
-        assert_eq!(cpu.halted, opcode == 0x76);
+        assert_eq!(
+            cpu.state,
+            if opcode == 0x76 {
+                CpuState::Halted
+            } else {
+                CpuState::Running
+            }
+        );
     }
 }

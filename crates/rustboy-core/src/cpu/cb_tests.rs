@@ -1,4 +1,4 @@
-use super::{tests::cpu_with_program, Cpu};
+use super::{tests::cpu_with_program, Cpu, CpuState};
 
 const MEMORY_OPERAND: u16 = 0xC080;
 
@@ -87,7 +87,7 @@ fn every_cb_opcode_has_the_expected_effect_for_all_values_and_flags() {
                         cpu.registers.sp,
                         step.cycles,
                         step.opcode,
-                        cpu.halted
+                        cpu.state
                     ),
                     (
                         expected,
@@ -96,7 +96,7 @@ fn every_cb_opcode_has_the_expected_effect_for_all_values_and_flags() {
                         0xFFFE,
                         expected_cycles,
                         Some(0xCB),
-                        false
+                        CpuState::Running
                     ),
                     "CB {opcode:02X}, value={value:02X}, flags={flags:02X}"
                 );

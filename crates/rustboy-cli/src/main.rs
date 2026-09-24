@@ -24,7 +24,9 @@ fn main() {
     let mut session = Session::new(Machine::new(cartridge));
     if let Err(error) = adapter.play() {
         eprintln!("Could not start audio: {error}");
-    } else if let Err(error) = run(&mut adapter, &mut session) {
+    } else if let Err(error) = run(&mut adapter, &mut session, |diagnostic| {
+        eprintln!("{diagnostic}")
+    }) {
         eprintln!("Emulator stopped: {error}");
     }
     if let Err(error) = adapter.stop() {

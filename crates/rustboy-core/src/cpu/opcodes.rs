@@ -23,7 +23,7 @@ use super::flags::{CpuFlag, Flags};
 use super::operand::Operand8;
 use super::registers::RegisterName16;
 use super::OpcodeResult::{Executed, UnknownOpcode};
-use super::{BinaryOperation8, Cpu, OpcodeResult, UnaryOperation8};
+use super::{BinaryOperation8, Cpu, CpuState, OpcodeResult, UnaryOperation8};
 
 pub fn execute(opcode: u8, cpu: &mut Cpu) -> OpcodeResult {
     let y = (opcode >> 3) & 7;
@@ -124,9 +124,10 @@ fn execute_relative_or_misc(y: u8, cpu: &mut Cpu) -> usize {
             20
         }
         2 => {
-            // STOP: preserve the current padding-byte/HALT approximation.
+            // STOP: consume padding and enter its distinct state; wake behavior
+            // remains the current HALT-like approximation in Cpu::handle_irq.
             cpu.fetch_byte();
-            cpu.halted = true;
+            cpu.state = CpuState::Stopped;
             4
         }
         3 => {
@@ -176,7 +177,7 @@ fn execute_load(destination_index: u8, source_index: u8, cpu: &mut Cpu) -> usize
         if !cpu.ime && cpu.pending_interrupts() != 0 {
             cpu.halt_bug = true;
         } else {
-            cpu.halted = true;
+            cpu.state = CpuState::Halted;
         }
         return 4;
     }

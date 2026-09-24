@@ -316,6 +316,9 @@ fn step(
     hardware: &mut TestHardware,
 ) -> Result<(usize, Option<u8>), std::convert::Infallible> {
     let result = emulator.step();
+    if let Some(diagnostic) = result.diagnostic {
+        eprintln!("{diagnostic}");
+    }
     if let Some(frame) = result.frame {
         hardware.present_frame(frame)?;
     }

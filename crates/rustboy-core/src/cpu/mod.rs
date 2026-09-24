@@ -3,6 +3,9 @@ mod flags;
 mod opcodes;
 mod operand;
 mod registers;
+mod state;
+
+pub use state::{CpuDiagnostic, CpuState};
 
 #[cfg(test)]
 mod timing_tests;
@@ -27,6 +30,7 @@ pub enum OpcodeResult {
 pub struct CpuStepResult {
     pub cycles: usize,
     pub opcode: Option<u8>,
+    pub diagnostic: Option<CpuDiagnostic>,
 }
 
 type UnaryOperation8 = fn(&mut Flags, u8) -> u8;
@@ -35,7 +39,7 @@ type BinaryOperation8 = fn(&mut Flags, u8, u8) -> u8;
 pub struct Cpu {
     registers: Registers,
     mmu: Mmu,
-    halted: bool,
+    state: CpuState,
     halt_bug: bool,
     ime: bool,        // Interrupt master enable, also modified by RETI and interrupt entry.
     ei_requested: u8, // Instruction completions remaining before EI takes effect.
@@ -58,7 +62,7 @@ impl Cpu {
         Cpu {
             registers: Registers::new(),
             mmu: Mmu::new(rom),
-            halted: false,
+            state: CpuState::Running,
             halt_bug: false,
             ime: false,
             ei_requested: 0,
@@ -72,11 +76,12 @@ impl Cpu {
             CpuStepResult {
                 cycles: 20,
                 opcode: None,
+                diagnostic: None,
             }
-        } else if !self.halted {
+        } else if self.state == CpuState::Running {
             let result = self.do_cycle();
             // EI itself consumes the first completion; the following instruction consumes
-            // the second. Interrupt entry and HALT idle are not instruction completions.
+            // the second. Interrupt entry and idle steps are not instruction completions.
             if self.ei_requested != 0 {
                 self.ei_requested -= 1;
                 if self.ei_requested == 0 {
@@ -88,6 +93,7 @@ impl Cpu {
             CpuStepResult {
                 cycles: 4,
                 opcode: None,
+                diagnostic: None,
             }
         };
 
@@ -97,7 +103,11 @@ impl Cpu {
     }
 
     pub fn next_opcode(&self) -> Option<u8> {
-        (!self.halted).then(|| self.mmu.read_byte(self.registers.pc))
+        (self.state == CpuState::Running).then(|| self.mmu.read_byte(self.registers.pc))
+    }
+
+    pub fn state(&self) -> CpuState {
+        self.state
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
@@ -134,9 +144,10 @@ impl Cpu {
             return false;
         }
 
-        // Any enabled request wakes HALT, even when IME is clear and the CPU must defer the
-        // actual interrupt service. The HALT-bug fetch behavior is handled separately.
-        self.halted = false;
+        // Preserve the existing wake behavior for every idle state, including the
+        // STOP and illegal-opcode approximations. Hardware-specific differences are
+        // separate work. Fetch suppression for the HALT bug is handled separately.
+        self.state = CpuState::Running;
         if !self.ime {
             return false;
         }
@@ -165,20 +176,23 @@ impl Cpu {
         let current_address = self.registers.pc;
         let opcode = self.fetch_byte();
 
-        let cycles = match opcodes::execute(opcode, self) {
-            OpcodeResult::Executed(ticks) => ticks,
+        let (cycles, diagnostic) = match opcodes::execute(opcode, self) {
+            OpcodeResult::Executed(ticks) => (ticks, None),
             OpcodeResult::UnknownOpcode => {
-                println!(
-                    "Unknown command {:#04X} at {:#06X}",
-                    opcode, current_address
-                );
-                self.halted = true;
-                4
-            } //NOOP on unknown opcodes
+                self.state = CpuState::IllegalOpcode;
+                (
+                    4,
+                    Some(CpuDiagnostic::IllegalOpcode {
+                        address: current_address,
+                        opcode,
+                    }),
+                )
+            }
         };
         CpuStepResult {
             cycles,
             opcode: Some(opcode),
+            diagnostic,
         }
     }
 
@@ -232,7 +246,7 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
-    use super::{opcodes, Cpu};
+    use super::{opcodes, Cpu, CpuDiagnostic, CpuState};
     use crate::cpu::flags::CpuFlag;
     use crate::mbc::Mbc;
 
@@ -266,6 +280,94 @@ mod tests {
         let result = cpu.tick();
         assert_eq!(result.cycles, cycles);
         assert_eq!(result.opcode, opcode);
+        assert_eq!(result.diagnostic, None);
+    }
+
+    #[test]
+    fn illegal_opcodes_report_once_and_idle_without_fetching_another_instruction() {
+        for opcode in [
+            0xD3, 0xDB, 0xDD, 0xE3, 0xE4, 0xEB, 0xEC, 0xED, 0xF4, 0xFC, 0xFD,
+        ] {
+            let mut cpu = cpu_with_program(&[opcode, 0x04]);
+            let result = cpu.tick();
+            assert_eq!((result.cycles, result.opcode), (4, Some(opcode)));
+            assert_eq!(
+                result.diagnostic,
+                Some(CpuDiagnostic::IllegalOpcode {
+                    address: 0x100,
+                    opcode
+                })
+            );
+            assert_eq!(cpu.state(), CpuState::IllegalOpcode);
+            assert_eq!(cpu.next_opcode(), None);
+            let registers = cpu.registers();
+            for _ in 0..3 {
+                assert_step(&mut cpu, 4, None);
+                assert_eq!(cpu.state(), CpuState::IllegalOpcode);
+                assert_eq!(cpu.registers.pc, 0x101);
+                assert_eq!(cpu.registers(), registers);
+            }
+        }
+    }
+
+    #[test]
+    fn illegal_opcode_diagnostic_keeps_the_fetch_address_when_pc_wraps() {
+        let mut cpu = cpu_with_program(&[]);
+        cpu.registers.pc = 0xFFFF;
+        cpu.mmu.write_byte(0xFFFF, 0xD3);
+        let result = cpu.tick();
+        assert_eq!(cpu.registers.pc, 0);
+        assert_eq!(
+            result.diagnostic,
+            Some(CpuDiagnostic::IllegalOpcode {
+                address: 0xFFFF,
+                opcode: 0xD3
+            })
+        );
+    }
+
+    #[test]
+    fn distinct_idle_states_preserve_device_ticks_and_existing_interrupt_wake_behavior() {
+        // STOP and illegal instructions currently wake like HALT. This is a
+        // compatibility regression, not a claim about their hardware behavior.
+        for (program, expected_state, resume_pc) in [
+            ([0x76, 0x04, 0], CpuState::Halted, 0x101),
+            ([0x10, 0, 0x04], CpuState::Stopped, 0x102),
+            ([0xD3, 0x04, 0], CpuState::IllegalOpcode, 0x101),
+        ] {
+            for ime in [false, true] {
+                let mut cpu = cpu_with_program(&program);
+                cpu.ime = ime;
+                cpu.mmu.write_byte(0xFF07, 0x05);
+                let entry = cpu.tick();
+                assert_eq!(entry.opcode, Some(program[0]));
+                assert_eq!(cpu.state(), expected_state);
+                assert_eq!(cpu.registers.pc, resume_pc);
+                assert_eq!(cpu.next_opcode(), None);
+                for _ in 0..3 {
+                    assert_step(&mut cpu, 4, None);
+                }
+                assert_eq!(cpu.mmu.read_byte(0xFF05), 1); // Sixteen T-cycles reached the timer.
+                let previous_b = cpu.registers.b;
+                cpu.mmu.write_byte(0xFFFF, 1);
+                cpu.mmu.write_byte(0xFF0F, 1);
+
+                if ime {
+                    assert_step(&mut cpu, 20, None);
+                    assert_eq!(cpu.registers.pc, 0x40);
+                    assert_eq!(cpu.mmu.read_word(cpu.registers.sp), resume_pc);
+                    assert_eq!(cpu.registers.b, previous_b);
+                    assert_eq!(cpu.mmu.read_byte(0xFF0F) & 1, 0);
+                } else {
+                    assert_step(&mut cpu, 4, Some(0x04));
+                    assert_eq!(cpu.registers.pc, resume_pc + 1);
+                    assert_eq!(cpu.registers.b, previous_b.wrapping_add(1));
+                    assert_eq!(cpu.mmu.read_byte(0xFF0F) & 1, 1);
+                }
+                assert_eq!(cpu.state(), CpuState::Running);
+                assert!(cpu.next_opcode().is_some());
+            }
+        }
     }
 
     #[test]
@@ -463,7 +565,7 @@ mod tests {
         cpu.mmu.write_byte(0xFF0F, 1);
 
         assert_step(&mut cpu, 4, Some(0x76));
-        assert!(!cpu.halted);
+        assert_eq!(cpu.state, CpuState::Running);
         assert_step(&mut cpu, 8, Some(0x3E));
         assert_eq!(cpu.registers.a, 0x3E);
         assert_eq!(cpu.registers.pc, 0x0102);
@@ -537,10 +639,10 @@ mod tests {
 
         assert_step(&mut cpu, 4, Some(0x76));
         assert_step(&mut cpu, 4, None);
-        assert!(cpu.halted);
+        assert_eq!(cpu.state, CpuState::Halted);
         cpu.mmu.write_byte(0xFF0F, 1);
         assert_step(&mut cpu, 20, None);
-        assert!(!cpu.halted);
+        assert_eq!(cpu.state, CpuState::Running);
         assert_eq!(cpu.mmu.read_word(cpu.registers.sp), 0x0101);
         assert_step(&mut cpu, 4, Some(0x04));
         assert_eq!(cpu.registers.pc, 0x0041);
@@ -554,7 +656,7 @@ mod tests {
 
         assert_step(&mut cpu, 4, Some(0x76));
         assert_step(&mut cpu, 4, None);
-        assert!(cpu.halted);
+        assert_eq!(cpu.state, CpuState::Halted);
         assert_eq!(cpu.registers.pc, 0x0101);
     }
 
@@ -577,7 +679,7 @@ mod tests {
         assert_eq!(cpu.registers.pc, 0x0101);
         assert_step(&mut cpu, 4, Some(0x76));
         assert_step(&mut cpu, 4, None);
-        assert!(cpu.halted);
+        assert_eq!(cpu.state, CpuState::Halted);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 `rustboy-core` is the deterministic Game Boy machine. It models the hardware inside the handheld without knowing how a ROM was loaded, how pixels are displayed, how audio reaches speakers, or how quickly the host computer runs.
 
-The public entry point is `Machine`. Create a `Cartridge` with `Cartridge::from_bytes`, put it into a `Machine`, then call `Machine::step`. Each step executes one CPU instruction, services an interrupt, or idles in HALT. It returns its cycle count plus any completed video frame or audio buffers. A frontend, test runner, or debugger decides what to do with those effects.
+The public entry point is `Machine`. Create a `Cartridge` with `Cartridge::from_bytes`, put it into a `Machine`, then call `Machine::step`. Each step handles one CPU instruction, services an interrupt, or idles. It returns its cycle count, any CPU diagnostic, and completed video/audio output. A frontend, test runner, or debugger decides what to do with those effects.
 
 ## Module guides
 
@@ -19,13 +19,13 @@ The single-file modules are covered below: [MMU](#memory-bus-mmu),
 
 The original Game Boy is synchronized by a 4,194,304 Hz master clock. A **T-cycle** is one tick of that clock and is the smallest timing unit used by the core. CPU instructions take a multiple of four T-cycles; four T-cycles make one CPU **M-cycle** (machine cycle).
 
-The CPU, timer, PPU, and APU advance from the same T-cycle count. Internally, `Cpu::tick` passes the step's consumed T-cycles through the MMU to the timer, PPU, and APU. Interrupt entry costs 20 T-cycles and HALT idle costs 4; both advance these devices just as instructions do. This ties device progress to CPU execution rather than the host computer's wall clock.
+The CPU, timer, PPU, and APU advance from the same T-cycle count. Internally, `Cpu::tick` passes the step's consumed T-cycles through the MMU to the timer, PPU, and APU. Interrupt entry costs 20 T-cycles and idle costs 4; both advance these devices just as instructions do. This ties device progress to CPU execution rather than the host computer's wall clock. STOP and illegal-opcode idle currently use this same timing approximation.
 
 Frontends map emulated T-cycles to real time. The desktop application targets 4,194,304 T-cycles per second and sleeps only for the unused portion of each host frame. The APU uses a fractional sample clock so that 4,194,304 emulated T-cycles produce exactly 48,000 audio output frames per second, despite that ratio not being an integer.
 
 ## Timing granularity
 
-Rustboy is **T-cycle-accounted**, not yet **M-cycle-executed**. Each `Machine::step` completes an instruction, interrupt entry, or HALT idle step, then advances devices by that step's total T-cycle count. Components such as the timer process individual T-cycle edges inside that total.
+Rustboy is **T-cycle-accounted**, not yet **M-cycle-executed**. Each `Machine::step` completes an instruction, interrupt entry, or idle step, then advances devices by that step's total T-cycle count. Components such as the timer process individual T-cycle edges inside that total.
 
 The core does not yet schedule every CPU memory read, write, and register update at its exact M-cycle bus phase. Hardware effects that depend on the ordering of a CPU write within a single M-cycle, such as some TIMA reload and HALT edge cases, therefore require future M-cycle or finer-grained CPU scheduling.
 
@@ -50,13 +50,24 @@ A Game Boy program is a ROM cartridge containing instructions and game data. The
 | Field | Meaning |
 | --- | --- |
 | `cycles` | T-cycles consumed by this step |
-| `opcode` | Executed base opcode, or `None` during interrupt entry/HALT idle |
+| `opcode` | Base opcode fetched for execution (including illegal encodings), or `None` during interrupt entry/idle |
+| `diagnostic` | Optional `CpuDiagnostic`, currently an illegal opcode's byte and fetch address |
 | `frame` | Optional row-major 160 × 144 buffer, one byte per pixel, shade indices `0–3` |
 | `audio_buffers` | Completed interleaved left/right `i16` buffers at 48,000 stereo frames/second |
 
 For a CB-prefixed instruction, `opcode` is `Some(0xCB)`. `next_opcode()` is only a
 peek at the current PC: interrupt dispatch may happen before that byte is executed.
 Tracing and ROM exit detection must use the step result, not the peek.
+
+`cpu_state()` exposes `CpuState::{Running, Halted, Stopped, IllegalOpcode}`.
+`next_opcode()` returns `None` in every non-running state. An illegal opcode emits
+one diagnostic on its encounter step; subsequent idle steps emit none. The CPU
+returns structured data rather than printing the diagnostic itself.
+
+The distinct states currently preserve the old transition behavior: an enabled
+pending interrupt request wakes any idle state, with IME deciding whether to service
+it or resume execution. Accurate STOP power/input behavior and permanent hardware
+illegal-opcode lockup remain future behavior changes.
 
 `process_input` accepts button events; `read_byte` and `registers` expose observations
 for a runner or debugger. Construction starts the CPU at `0x0100` with hard-coded
