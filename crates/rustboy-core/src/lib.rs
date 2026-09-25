@@ -16,6 +16,7 @@ pub use cpu::{CpuDiagnostic, CpuState, RegisterValues};
 
 use crate::cpu::Cpu;
 use crate::mbc::Cartridge;
+use crate::mmu::Mmu;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Button {
@@ -53,37 +54,44 @@ pub struct StepResult {
 
 pub struct Machine {
     cpu: Cpu,
+    mmu: Mmu,
 }
 
 impl Machine {
     pub fn new(cartridge: Cartridge) -> Self {
         Self {
-            cpu: Cpu::new(cartridge.into_controller()),
+            cpu: Cpu::new(),
+            mmu: Mmu::new(cartridge.into_controller()),
         }
     }
 
     pub fn step(&mut self) -> StepResult {
-        let result = self.cpu.tick();
+        // Requests from the preceding step are collected before CPU dispatch.
+        // Devices then advance by this step's total, exactly once, before output
+        // collection. Bus accesses are still instruction-batched, not M-cycle scheduled.
+        self.mmu.process_irq_requests();
+        let result = self.cpu.tick(&mut self.mmu);
+        self.mmu.do_ticks(result.cycles);
         StepResult {
             cycles: result.cycles,
             opcode: result.opcode,
             diagnostic: result.diagnostic,
-            frame: self.cpu.take_frame(),
-            audio_buffers: self.cpu.take_audio_buffers(),
+            frame: self.mmu.take_frame(),
+            audio_buffers: self.mmu.take_audio_buffers(),
         }
     }
 
     pub fn process_input(&mut self, event: ButtonEvent) {
-        self.cpu.process_input_event(event);
+        self.mmu.process_input_event(event);
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
-        self.cpu.read_byte(address)
+        self.mmu.read_byte(address)
     }
 
     /// Peeks at the current PC when awake; interrupt entry may precede its execution.
     pub fn next_opcode(&self) -> Option<u8> {
-        self.cpu.next_opcode()
+        self.cpu.next_opcode(&self.mmu)
     }
 
     pub fn registers(&self) -> RegisterValues {
@@ -98,6 +106,61 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn machine_with_program(program: &[u8]) -> Machine {
+        let mut rom = vec![0; 0x8000];
+        rom[0x100..0x100 + program.len()].copy_from_slice(program);
+        Machine::new(Cartridge::from_bytes(rom).expect("valid ROM"))
+    }
+
+    #[test]
+    fn device_requests_are_collected_at_the_next_step_before_operand_reads() {
+        let mut machine = machine_with_program(&[0x00, 0xF0, 0x0F]); // NOP; LDH A,(IF)
+        machine.mmu.write_byte(0xFF05, 0xFF);
+        machine.mmu.write_byte(0xFF07, 0x05);
+        machine.mmu.do_ticks(16); // TIMA overflow; reload is four cycles away.
+
+        let first = machine.step();
+        assert_eq!((first.cycles, first.opcode), (4, Some(0x00)));
+        // The NOP's device advancement requests an interrupt, but it is not
+        // collected into IF until the next step starts.
+        assert_eq!(machine.read_byte(0xFF0F) & 4, 0);
+        let second = machine.step();
+        assert_eq!((second.cycles, second.opcode), (12, Some(0xF0)));
+        assert_eq!(machine.registers().a & 4, 4);
+        assert_eq!(machine.read_byte(0xFF0F) & 4, 4);
+    }
+
+    #[test]
+    fn devices_advance_after_cpu_bus_accesses() {
+        let mut machine = machine_with_program(&[0xF0, 0x04]); // LDH A,(DIV)
+        machine.mmu.do_ticks(252);
+        assert_eq!(machine.read_byte(0xFF04), 0);
+
+        let result = machine.step();
+
+        assert_eq!((result.cycles, result.opcode), (12, Some(0xF0)));
+        assert_eq!(machine.registers().a, 0); // Read before the divider advances.
+        assert_eq!(machine.read_byte(0xFF04), 1);
+    }
+
+    #[test]
+    fn input_reaches_the_joypad_without_executing_a_cpu_step() {
+        let mut machine = machine_with_program(&[0]);
+        let registers = machine.registers();
+        assert_eq!(machine.read_byte(0xFF00) & 1, 1);
+        machine.process_input(ButtonEvent {
+            button: Button::Right,
+            state: ButtonState::Pressed,
+        });
+        assert_eq!(machine.read_byte(0xFF00) & 1, 0);
+        machine.process_input(ButtonEvent {
+            button: Button::Right,
+            state: ButtonState::Released,
+        });
+        assert_eq!(machine.read_byte(0xFF00) & 1, 1);
+        assert_eq!(machine.registers(), registers);
+    }
 
     #[test]
     fn machine_exposes_cpu_state_and_one_shot_structured_diagnostics() {

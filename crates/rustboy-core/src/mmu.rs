@@ -6,6 +6,7 @@ use crate::timer::Timer;
 
 use crate::mbc::Mbc;
 use crate::serial::Serial;
+use crate::ButtonEvent;
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
@@ -16,7 +17,7 @@ pub struct Mmu {
     ppu: Ppu,
     apu: Apu,
     timer: Timer,
-    pub joypad: Joypad,
+    joypad: Joypad,
     mbc: Box<dyn Mbc + 'static>,
     serial: Serial,
     interrupt_enable: u8,
@@ -107,6 +108,10 @@ impl Mmu {
 
     pub fn take_frame(&mut self) -> Option<Vec<u8>> {
         self.ppu.take_frame()
+    }
+
+    pub fn process_input_event(&mut self, event: ButtonEvent) {
+        self.joypad.receive_event(event);
     }
 
     pub fn take_audio_buffers(&mut self) -> Vec<Vec<i16>> {

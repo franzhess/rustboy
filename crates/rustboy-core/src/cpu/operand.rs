@@ -1,5 +1,6 @@
 use super::registers::RegisterName8;
 use super::Cpu;
+use crate::mmu::Mmu;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Operand8 {
@@ -22,17 +23,17 @@ impl Operand8 {
         }
     }
 
-    pub fn read(self, cpu: &Cpu) -> u8 {
+    pub fn read(self, cpu: &Cpu, mmu: &Mmu) -> u8 {
         match self {
             Self::Register(register) => cpu.registers.get(register),
-            Self::IndirectHl => cpu.mmu.read_byte(cpu.registers.get_hl()),
+            Self::IndirectHl => mmu.read_byte(cpu.registers.get_hl()),
         }
     }
 
-    pub fn write(self, cpu: &mut Cpu, value: u8) {
+    pub fn write(self, cpu: &mut Cpu, mmu: &mut Mmu, value: u8) {
         match self {
             Self::Register(register) => cpu.registers.set(register, value),
-            Self::IndirectHl => cpu.mmu.write_byte(cpu.registers.get_hl(), value),
+            Self::IndirectHl => mmu.write_byte(cpu.registers.get_hl(), value),
         }
     }
 }

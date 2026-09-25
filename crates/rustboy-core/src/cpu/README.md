@@ -3,7 +3,8 @@
 This module implements the Game Boy's SM83 CPU inside
 [`rustboy-core`](../../README.md). It is an 8-bit processor with a 16-bit address
 space, related to the 8080/Z80 family but with its own instruction set and timing.
-It owns the MMU and drives devices using emulated cycles, not host time.
+It owns registers and execution state, and borrows the machine-owned MMU while
+executing. `Machine` coordinates device requests, T-cycle advancement and output.
 
 ## Source layout
 
@@ -60,15 +61,21 @@ Construction starts at PC `0x0100`, with AF=`01B0`, BC=`0013`, DE=`00D8`, HL=`01
 and SP=`FFFE`. These are current implementation defaults, not the result of an
 emulated boot ROM or a guarantee of exact DMG post-boot state. IME starts clear.
 
-## One CPU step
+## One machine step
 
-`Cpu::tick` performs the following sequence:
+`Machine` owns the CPU and MMU separately and performs this sequence:
 
-1. Collect device interrupt requests and check whether interrupt entry is needed.
-2. If an interrupt is serviced, perform entry without executing a handler instruction.
-3. Otherwise, execute one instruction when running, or consume an idle step.
-4. Complete pending EI-delay bookkeeping after an executed instruction.
-5. Advance the MMU's timer, PPU, and APU by the step's total T-cycles.
+1. Collect device interrupt requests into IF through the MMU.
+2. Lend the MMU to `Cpu::tick(&mut mmu)`. The CPU checks for interrupts, then either
+   performs interrupt entry, executes one instruction when running, or idles.
+3. The CPU completes pending EI-delay bookkeeping after an executed instruction
+   and returns cycles, opcode and optional diagnostic. It does not advance devices.
+4. `Machine` advances the MMU's timer, PPU and APU by the returned T-cycle total.
+5. `Machine` collects completed frames and audio buffers into the public step result.
+
+Opcode handlers, fetch/stack helpers and `Operand8` receive an explicit bus borrow
+where needed. Reads use `&Mmu`; writes use `&mut Mmu`. Pure register/ALU helpers
+need no bus. The CPU no longer forwards input, memory inspection or device output.
 
 The opcode handlers return `OpcodeResult::Executed(t_cycles)` or
 `OpcodeResult::UnknownOpcode`. The public machine returns the executed **base**
@@ -309,6 +316,12 @@ cargo test -p rustboy-core cpu::timing_tests
 cargo test -p rustboy-core cpu::cb_tests
 cargo test -p rustboy-core cpu::base_tests
 ```
+
+CPU integration fixtures contain a real `Machine` with a synthetic cartridge;
+instruction tests use `Machine::step`, exercising the production coordination path.
+Separate boundary tests verify request collection before operand reads, device
+advancement after CPU bus accesses, input routing without stepping, and CPU-only
+execution against a borrowed bus without automatic device advancement.
 
 The timing tests execute all **244 legal unprefixed instructions** and all **256
 CB-prefixed instructions** across all sixteen flag combinations. That includes

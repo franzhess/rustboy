@@ -1,4 +1,5 @@
-use super::{opcodes, tests::cpu_with_program, Cpu, OpcodeResult};
+use super::{opcodes, tests::machine_with_program, OpcodeResult};
+use crate::Machine;
 
 // SM83 instruction durations in T-cycles, with conditional branches NOT taken.
 // Reference: https://gbdev.io/gb-opcodes/optables/ (normal-speed DMG).
@@ -22,18 +23,18 @@ const BASE_CYCLES: [[usize; 16]; 16] = [
     [12, 12, 8, 4, 0, 16, 8, 16, 12, 8, 16, 4, 0, 0, 8, 16],
 ];
 
-fn cpu(program: &[u8], flags: u8) -> Cpu {
-    let mut cpu = cpu_with_program(program);
-    cpu.registers.set_af(0x1200 | u16::from(flags));
-    cpu.registers.set_bc(0xC080);
-    cpu.registers.set_de(0xC100);
-    cpu.registers.set_hl(0xC200);
-    cpu.registers.sp = 0xC300;
-    cpu.mmu.write_word(0xC300, 0xC400);
-    cpu.mmu.write_byte(0xC200, 0x81);
-    cpu.mmu.write_byte(0xFFFF, 0);
-    cpu.mmu.write_byte(0xFF0F, 0);
-    cpu
+fn machine(program: &[u8], flags: u8) -> Machine {
+    let mut machine = machine_with_program(program);
+    machine.cpu.registers.set_af(0x1200 | u16::from(flags));
+    machine.cpu.registers.set_bc(0xC080);
+    machine.cpu.registers.set_de(0xC100);
+    machine.cpu.registers.set_hl(0xC200);
+    machine.cpu.registers.sp = 0xC300;
+    machine.mmu.write_word(0xC300, 0xC400);
+    machine.mmu.write_byte(0xC200, 0x81);
+    machine.mmu.write_byte(0xFFFF, 0);
+    machine.mmu.write_byte(0xFF0F, 0);
+    machine
 }
 
 #[test]
@@ -46,10 +47,10 @@ fn every_base_opcode_has_the_documented_duration_for_all_flag_combinations() {
         }
         for flags in (0..=u8::MAX).step_by(16) {
             // Immediate word targets WRAM; STOP consumes its mandatory zero byte.
-            let mut cpu = cpu(&[opcode, 0, 0xC4], flags);
+            let mut machine = machine(&[opcode, 0, 0xC4], flags);
             if base == 0 {
                 assert!(matches!(
-                    opcodes::execute(opcode, &mut cpu),
+                    opcodes::execute(opcode, &mut machine.cpu, &mut machine.mmu),
                     OpcodeResult::UnknownOpcode
                 ));
                 continue;
@@ -70,7 +71,7 @@ fn every_base_opcode_has_the_documented_duration_for_all_flag_combinations() {
                 } else {
                     0
                 };
-            let result = cpu.tick();
+            let result = machine.step();
             assert_eq!(result.opcode, Some(opcode));
             if result.cycles != expected {
                 failures.push(format!(
@@ -97,10 +98,10 @@ fn every_cb_opcode_includes_prefix_and_memory_access_cycles() {
             16
         };
         for flags in (0..=u8::MAX).step_by(16) {
-            let mut cpu = cpu(&[0xCB, opcode], flags);
-            let result = cpu.tick();
+            let mut machine = machine(&[0xCB, opcode], flags);
+            let result = machine.step();
             assert_eq!(result.opcode, Some(0xCB));
-            assert_eq!(cpu.registers.pc, 0x102);
+            assert_eq!(machine.cpu.registers.pc, 0x102);
             if result.cycles != expected {
                 failures.push(format!(
                     "CB {opcode:02X}, flags {flags:02X}: expected {expected}, got {}",
