@@ -64,7 +64,7 @@ struct TestHardware;
 impl FrameSink for TestHardware {
     type Error = std::convert::Infallible;
 
-    fn present_frame(&mut self, _screen_buffer: Frame) -> Result<(), Self::Error> {
+    fn present_frame(&mut self, _screen_buffer: &Frame) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -72,7 +72,7 @@ impl FrameSink for TestHardware {
 impl AudioSink for TestHardware {
     type Error = std::convert::Infallible;
 
-    fn queue_audio(&mut self, _sound_buffer: AudioBuffer) -> Result<(), Self::Error> {
+    fn queue_audio(&mut self, _sound_buffer: &AudioBuffer) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -319,10 +319,10 @@ fn step(
     if let Some(diagnostic) = result.diagnostic {
         eprintln!("{diagnostic}");
     }
-    if let Some(frame) = result.frame {
+    if let Some(frame) = &result.frame {
         hardware.present_frame(frame)?;
     }
-    for buffer in result.audio_buffers {
+    for buffer in &result.audio_buffers {
         hardware.queue_audio(buffer)?;
     }
     Ok((result.cycles, result.opcode))

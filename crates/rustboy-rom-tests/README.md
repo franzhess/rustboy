@@ -29,8 +29,8 @@ The runner provides a small test implementation of the application frame and aud
 ## Scope
 
 The no-op frame and audio sinks use `Infallible` as their associated error type.
-They consume the core's validated `Frame` and `AudioBuffer` values without rendering
-or copying their data.
+They borrow the core's validated `Frame` and `AudioBuffer` values without rendering
+or copying their data; the step result retains ownership during delivery.
 The stepping helpers propagate that type; output delivery cannot produce a runner
 failure. ROM loading errors, assertion failures, timeouts and captured core panics
 remain separate outcomes.

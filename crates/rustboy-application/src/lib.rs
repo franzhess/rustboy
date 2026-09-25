@@ -10,13 +10,15 @@ use std::time::{Duration, Instant};
 pub trait FrameSink {
     type Error: Error + 'static;
 
-    fn present_frame(&mut self, frame: Frame) -> Result<(), Self::Error>;
+    /// Reads the frame during this call. Sinks retaining data must own a copy.
+    fn present_frame(&mut self, frame: &Frame) -> Result<(), Self::Error>;
 }
 
 pub trait AudioSink {
     type Error: Error + 'static;
 
-    fn queue_audio(&mut self, samples: AudioBuffer) -> Result<(), Self::Error>;
+    /// Transfers samples during this call; queued playback must not retain the borrow.
+    fn queue_audio(&mut self, samples: &AudioBuffer) -> Result<(), Self::Error>;
 }
 
 pub trait InputSource {
@@ -113,12 +115,12 @@ pub fn advance_frame(
         if let Some(diagnostic) = result.diagnostic {
             report_diagnostic(diagnostic);
         }
-        if let Some(frame) = result.frame {
+        if let Some(frame) = &result.frame {
             outputs
                 .present_frame(frame)
                 .map_err(|error| RunError::Frame(Box::new(error)))?;
         }
-        for buffer in result.audio_buffers {
+        for buffer in &result.audio_buffers {
             outputs
                 .queue_audio(buffer)
                 .map_err(|error| RunError::Audio(Box::new(error)))?;
@@ -178,7 +180,7 @@ mod test {
     impl FrameSink for FailingPlatform {
         type Error = io::Error;
 
-        fn present_frame(&mut self, _frame: Frame) -> Result<(), Self::Error> {
+        fn present_frame(&mut self, _frame: &Frame) -> Result<(), Self::Error> {
             self.frames += 1;
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -190,7 +192,7 @@ mod test {
     impl AudioSink for FailingPlatform {
         type Error = io::Error;
 
-        fn queue_audio(&mut self, _samples: AudioBuffer) -> Result<(), Self::Error> {
+        fn queue_audio(&mut self, _samples: &AudioBuffer) -> Result<(), Self::Error> {
             self.audio_buffers += 1;
             Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
@@ -291,7 +293,7 @@ mod test {
     impl FrameSink for TestOutputs {
         type Error = Infallible;
 
-        fn present_frame(&mut self, _frame: Frame) -> Result<(), Self::Error> {
+        fn present_frame(&mut self, _frame: &Frame) -> Result<(), Self::Error> {
             self.frames += 1;
             Ok(())
         }
@@ -300,7 +302,7 @@ mod test {
     impl AudioSink for TestOutputs {
         type Error = Infallible;
 
-        fn queue_audio(&mut self, _samples: AudioBuffer) -> Result<(), Self::Error> {
+        fn queue_audio(&mut self, _samples: &AudioBuffer) -> Result<(), Self::Error> {
             self.audio_buffers += 1;
             Ok(())
         }

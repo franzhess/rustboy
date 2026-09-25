@@ -13,6 +13,11 @@
 
 `Sdl3Adapter` implements the application `InputSource`, `FrameSink`, and `AudioSink` ports. It does not decide how many Game Boy cycles to run; that is application policy.
 
+The output ports and display/audio helpers borrow `&Frame` and `&AudioBuffer` for
+each call. Rendering reads the frame in place; audio submission passes the sample
+slice to SDL, which copies it into its stream for later playback. The Rust adapter
+does not clone the producer's buffers or retain references after returning.
+
 ## Requirements
 
 SDL3 development libraries must be available to build this crate. See the workspace README for platform installation guidance.

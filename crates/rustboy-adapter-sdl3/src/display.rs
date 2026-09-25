@@ -32,7 +32,7 @@ impl Display {
         Ok(Self { canvas })
     }
 
-    pub fn draw_screen(&mut self, frame: Frame) -> Result<(), sdl3::Error> {
+    pub fn draw_screen(&mut self, frame: &Frame) -> Result<(), sdl3::Error> {
         self.canvas.set_draw_color(Color::RGB(0x08, 0x18, 0x20));
         self.canvas.clear();
         for (i, pixel) in frame.pixels().iter().enumerate() {

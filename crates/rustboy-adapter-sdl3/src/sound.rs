@@ -20,7 +20,7 @@ impl Sound {
         })
     }
 
-    pub fn queue(&mut self, data: AudioBuffer) -> Result<(), sdl3::Error> {
+    pub fn queue(&mut self, data: &AudioBuffer) -> Result<(), sdl3::Error> {
         self.stream.put_data_i16(data.samples())
     }
 

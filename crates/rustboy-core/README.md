@@ -117,6 +117,11 @@ and `into_pixels()`/`into_samples()` preserve the original vector allocation and
 capacity. The PPU still copies its screen into one vector when publishing a frame;
 the APU still moves completed sample vectors out with `mem::take`.
 
+The core transfers ownership of completed outputs to `StepResult`. Synchronous
+application sinks borrow these values as `&Frame` and `&AudioBuffer`; the step
+result owns their storage throughout delivery. A backend retaining data beyond
+the call must own its copy, as SDL does for queued audio playback.
+
 Run format and storage-preservation tests with `cargo test -p rustboy-core output::tests`.
 
 ## Memory bus (MMU)

@@ -50,7 +50,7 @@ impl InputSource for Sdl3Adapter {
 impl FrameSink for Sdl3Adapter {
     type Error = sdl3::Error;
 
-    fn present_frame(&mut self, frame: Frame) -> Result<(), Self::Error> {
+    fn present_frame(&mut self, frame: &Frame) -> Result<(), Self::Error> {
         self.display.draw_screen(frame)
     }
 }
@@ -58,7 +58,7 @@ impl FrameSink for Sdl3Adapter {
 impl AudioSink for Sdl3Adapter {
     type Error = sdl3::Error;
 
-    fn queue_audio(&mut self, samples: AudioBuffer) -> Result<(), Self::Error> {
+    fn queue_audio(&mut self, samples: &AudioBuffer) -> Result<(), Self::Error> {
         self.sound.queue(samples)
     }
 }
