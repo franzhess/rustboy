@@ -4,7 +4,7 @@ use ::sdl3::rect::Point;
 use ::sdl3::render::WindowCanvas;
 use ::sdl3::sys::render::SDL_LOGICAL_PRESENTATION_INTEGER_SCALE;
 use ::sdl3::Sdl;
-use rustboy_core::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use rustboy_core::{Frame, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 pub struct Display {
     canvas: WindowCanvas,
@@ -32,10 +32,10 @@ impl Display {
         Ok(Self { canvas })
     }
 
-    pub fn draw_screen(&mut self, screen_buffer: Vec<u8>) -> Result<(), sdl3::Error> {
+    pub fn draw_screen(&mut self, frame: Frame) -> Result<(), sdl3::Error> {
         self.canvas.set_draw_color(Color::RGB(0x08, 0x18, 0x20));
         self.canvas.clear();
-        for (i, pixel) in screen_buffer.iter().enumerate() {
+        for (i, pixel) in frame.pixels().iter().enumerate() {
             self.canvas.set_draw_color(map_color(*pixel));
             self.canvas.draw_point(Point::new(
                 (i % SCREEN_WIDTH) as i32,

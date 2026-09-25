@@ -6,7 +6,7 @@ use crate::timer::Timer;
 
 use crate::mbc::Mbc;
 use crate::serial::Serial;
-use crate::ButtonEvent;
+use crate::{AudioBuffer, ButtonEvent, Frame};
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
@@ -106,7 +106,7 @@ impl Mmu {
         self.apu.do_ticks(ticks);
     }
 
-    pub fn take_frame(&mut self) -> Option<Vec<u8>> {
+    pub fn take_frame(&mut self) -> Option<Frame> {
         self.ppu.take_frame()
     }
 
@@ -114,7 +114,7 @@ impl Mmu {
         self.joypad.receive_event(event);
     }
 
-    pub fn take_audio_buffers(&mut self) -> Vec<Vec<i16>> {
+    pub fn take_audio_buffers(&mut self) -> Vec<AudioBuffer> {
         self.apu.take_audio_buffers()
     }
 

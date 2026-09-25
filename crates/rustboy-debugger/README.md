@@ -20,3 +20,6 @@ The synchronous `Machine::step` API is the foundation for these features. The te
 The current facade re-exports `CpuState` and `CpuDiagnostic` alongside `Machine`,
 `RegisterValues` and `StepResult`. A debugger can inspect `Machine::cpu_state()`
 and record the optional diagnostic from each step without scraping terminal output.
+
+It also re-exports `Frame` and `AudioBuffer` for inspecting the typed output values
+in `StepResult`; their pixel/sample slices are immutable.

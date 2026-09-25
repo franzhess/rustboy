@@ -1,7 +1,7 @@
 use libtest_mimic::{Arguments, Failed, Trial};
 use rustboy_adapter_rom::{load_rom, LoadError};
 use rustboy_application::{AudioSink, FrameSink, Session};
-use rustboy_core::{Machine, CPU_FREQUENCY};
+use rustboy_core::{AudioBuffer, Frame, Machine, CPU_FREQUENCY};
 use serde::Deserialize;
 use std::fs;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -64,7 +64,7 @@ struct TestHardware;
 impl FrameSink for TestHardware {
     type Error = std::convert::Infallible;
 
-    fn present_frame(&mut self, _screen_buffer: Vec<u8>) -> Result<(), Self::Error> {
+    fn present_frame(&mut self, _screen_buffer: Frame) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -72,7 +72,7 @@ impl FrameSink for TestHardware {
 impl AudioSink for TestHardware {
     type Error = std::convert::Infallible;
 
-    fn queue_audio(&mut self, _sound_buffer: Vec<i16>) -> Result<(), Self::Error> {
+    fn queue_audio(&mut self, _sound_buffer: AudioBuffer) -> Result<(), Self::Error> {
         Ok(())
     }
 }

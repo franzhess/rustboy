@@ -1,6 +1,6 @@
 use ::sdl3::audio::{AudioFormat, AudioSpec, AudioStreamOwner};
 use ::sdl3::Sdl;
-use rustboy_core::AUDIO_OUTPUT_FREQUENCY;
+use rustboy_core::{AudioBuffer, AUDIO_CHANNELS, AUDIO_OUTPUT_FREQUENCY};
 
 pub struct Sound {
     stream: AudioStreamOwner,
@@ -11,7 +11,7 @@ impl Sound {
         let audio = sdl.audio()?;
         let spec = AudioSpec {
             freq: Some(AUDIO_OUTPUT_FREQUENCY as i32),
-            channels: Some(2),
+            channels: Some(AUDIO_CHANNELS as i32),
             format: Some(AudioFormat::s16_sys()),
         };
         let device = audio.open_playback_device(&spec)?;
@@ -20,8 +20,8 @@ impl Sound {
         })
     }
 
-    pub fn queue(&mut self, data: Vec<i16>) -> Result<(), sdl3::Error> {
-        self.stream.put_data_i16(&data)
+    pub fn queue(&mut self, data: AudioBuffer) -> Result<(), sdl3::Error> {
+        self.stream.put_data_i16(data.samples())
     }
 
     pub fn play(&mut self) -> Result<(), sdl3::Error> {

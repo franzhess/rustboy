@@ -5,6 +5,7 @@ mod wave;
 use crate::apu::noise::Noise;
 use crate::apu::tone::Tone;
 use crate::apu::wave::Wave;
+use crate::AudioBuffer;
 use crate::AUDIO_OUTPUT_FREQUENCY;
 use crate::CPU_FREQUENCY;
 
@@ -13,7 +14,7 @@ const AUDIO_BUFFER_SAMPLES: usize = 1600;
 
 pub struct Apu {
     enabled: bool,
-    audio_buffers: Vec<Vec<i16>>,
+    audio_buffers: Vec<AudioBuffer>,
     sample_clock: SampleClock,
     buffer: Vec<i16>,
     timer_counter: usize,
@@ -112,12 +113,16 @@ impl Apu {
             self.buffer.push(right);
 
             if self.buffer.len() >= AUDIO_BUFFER_SAMPLES {
-                self.audio_buffers.push(std::mem::take(&mut self.buffer));
+                let samples = std::mem::take(&mut self.buffer);
+                self.audio_buffers.push(
+                    AudioBuffer::try_from(samples)
+                        .expect("APU emits complete left/right sample pairs"),
+                );
             }
         }
     }
 
-    pub fn take_audio_buffers(&mut self) -> Vec<Vec<i16>> {
+    pub fn take_audio_buffers(&mut self) -> Vec<AudioBuffer> {
         std::mem::take(&mut self.audio_buffers)
     }
 

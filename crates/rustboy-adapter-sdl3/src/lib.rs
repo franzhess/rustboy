@@ -8,7 +8,7 @@ use crate::input::Input;
 use crate::sound::Sound;
 pub use error::InitError;
 use rustboy_application::{AudioSink, FrameSink, InputSource, RunState};
-use rustboy_core::ButtonEvent;
+use rustboy_core::{AudioBuffer, ButtonEvent, Frame};
 
 pub struct Sdl3Adapter {
     input: Input,
@@ -50,7 +50,7 @@ impl InputSource for Sdl3Adapter {
 impl FrameSink for Sdl3Adapter {
     type Error = sdl3::Error;
 
-    fn present_frame(&mut self, frame: Vec<u8>) -> Result<(), Self::Error> {
+    fn present_frame(&mut self, frame: Frame) -> Result<(), Self::Error> {
         self.display.draw_screen(frame)
     }
 }
@@ -58,7 +58,7 @@ impl FrameSink for Sdl3Adapter {
 impl AudioSink for Sdl3Adapter {
     type Error = sdl3::Error;
 
-    fn queue_audio(&mut self, samples: Vec<i16>) -> Result<(), Self::Error> {
+    fn queue_audio(&mut self, samples: AudioBuffer) -> Result<(), Self::Error> {
         self.sound.queue(samples)
     }
 }

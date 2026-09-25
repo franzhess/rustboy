@@ -1,3 +1,4 @@
+use crate::Frame;
 use crate::SCREEN_HEIGHT;
 use crate::SCREEN_WIDTH;
 
@@ -20,7 +21,7 @@ pub struct Ppu {
 
     screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
     color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
-    frame: Option<Vec<u8>>,
+    frame: Option<Frame>,
 
     clock: usize,
     vram: [u8; VRAM_SIZE],
@@ -185,15 +186,17 @@ impl Ppu {
         }
     }
 
-    pub fn get_screen_buffer(&self) -> Vec<u8> {
-        self.screen_buffer
+    pub fn get_screen_buffer(&self) -> Frame {
+        let pixels: Vec<u8> = self
+            .screen_buffer
             .iter()
             .flat_map(|array| array.iter())
             .cloned()
-            .collect()
+            .collect();
+        Frame::try_from(pixels).expect("PPU renders one screen of valid DMG shades")
     }
 
-    pub fn take_frame(&mut self) -> Option<Vec<u8>> {
+    pub fn take_frame(&mut self) -> Option<Frame> {
         self.frame.take()
     }
 
@@ -476,7 +479,7 @@ mod test {
             assert_eq!(ppu.take_stat_interrupt(), stat_enabled);
             assert!(!ppu.take_stat_interrupt());
             assert_eq!(
-                ppu.take_frame().expect("completed frame").len(),
+                ppu.take_frame().expect("completed frame").pixels().len(),
                 SCREEN_WIDTH * SCREEN_HEIGHT
             );
 

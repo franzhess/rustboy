@@ -175,6 +175,12 @@ is not the same as a Game Boy video frame. `take_audio_buffers` drains completed
 buffers; any partially filled buffer stays inside the APU. `Machine::step` returns
 these buffers to the application layer for delivery to an audio sink.
 
+Completed vectors are wrapped in the core's `AudioBuffer`, which guarantees an
+even number of interleaved samples. `samples()` borrows the PCM values and
+`frame_count()` counts left/right pairs. Wrapping the vector retains its allocation;
+the current 1,600-sample batching and `mem::take` ownership transfer are unchanged.
+The public format is described in the [core output contract](../../README.md#output-formats).
+
 ## Current power-control limitations
 
 NR52 bit 7 updates `Apu::enabled`, and reads report that flag plus the four channel

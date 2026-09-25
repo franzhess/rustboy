@@ -3,6 +3,7 @@ mod cpu;
 mod joypad;
 pub mod mbc;
 mod mmu;
+mod output;
 mod ppu;
 mod serial;
 mod timer;
@@ -10,9 +11,13 @@ mod timer;
 pub const CPU_FREQUENCY: usize = 4_194_304;
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
+/// Stereo sample frames (left/right pairs) emitted per emulated second.
 pub const AUDIO_OUTPUT_FREQUENCY: usize = 48_000;
+/// Interleaved channel count: left followed by right.
+pub const AUDIO_CHANNELS: usize = 2;
 
 pub use cpu::{CpuDiagnostic, CpuState, RegisterValues};
+pub use output::{AudioBuffer, AudioBufferError, Frame, FrameError};
 
 use crate::cpu::Cpu;
 use crate::mbc::Cartridge;
@@ -48,8 +53,10 @@ pub struct StepResult {
     pub opcode: Option<u8>,
     /// A diagnostic from this step, emitted once per encounter rather than during idle.
     pub diagnostic: Option<CpuDiagnostic>,
-    pub frame: Option<Vec<u8>>,
-    pub audio_buffers: Vec<Vec<i16>>,
+    /// A complete DMG frame with validated dimensions and shade indices.
+    pub frame: Option<Frame>,
+    /// Completed PCM buffers containing whole left/right sample pairs.
+    pub audio_buffers: Vec<AudioBuffer>,
 }
 
 pub struct Machine {

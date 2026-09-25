@@ -5,8 +5,11 @@
 ## What SDL3 provides
 
 - **Input**: translates keyboard and gamepad events into Game Boy button presses and releases. Arrow keys map to the directional pad, `A` and `S` map to the A and B buttons, Space maps to Select, Return maps to Start, and Escape quits.
-- **Display**: uploads the core's 160 by 144 pixel frame to an SDL renderer and scales it using integer scaling so Game Boy pixels remain crisp.
-- **Audio**: sends the core's interleaved stereo `i16` sample buffers to an SDL audio stream.
+- **Display**: reads the core's validated 160 by 144 `Frame`, maps shade indices
+  `0–3` to the frontend palette, and scales it using integer scaling.
+- **Audio**: reads interleaved left/right samples from `AudioBuffer` and sends
+  them to an SDL stream configured for `AUDIO_CHANNELS` (2) and
+  `AUDIO_OUTPUT_FREQUENCY` (48,000 stereo frames/second), using native signed `i16` PCM.
 
 `Sdl3Adapter` implements the application `InputSource`, `FrameSink`, and `AudioSink` ports. It does not decide how many Game Boy cycles to run; that is application policy.
 

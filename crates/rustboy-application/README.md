@@ -13,8 +13,11 @@ The cycle budget is tested separately from wall-clock sleeping. That separation 
 Ports are small traits defined by the application and implemented by adapters:
 
 - `InputSource` supplies Game Boy button events and a quit decision.
-- `FrameSink` receives completed 160 by 144 pixel frames.
-- `AudioSink` receives generated stereo sample buffers.
+- `FrameSink` takes ownership of a validated core `Frame`: 160 by 144 row-major
+  DMG shade indices. `Frame::pixels()` exposes its immutable pixel slice.
+- `AudioSink` takes ownership of a core `AudioBuffer`: interleaved signed `i16`
+  left/right samples at 48,000 stereo frames/second. `AudioBuffer::samples()` exposes
+  its immutable sample slice and `frame_count()` counts complete stereo pairs.
 - `RomSource` creates a core `Cartridge` from an external source, returning
   `Result<Cartridge, Self::Error>`. Each adapter supplies an associated `Error`
   type implementing `std::error::Error`, preserving structured failures and their
@@ -22,6 +25,10 @@ Ports are small traits defined by the application and implemented by adapters:
   `S: RomSource`; trait objects specify `dyn RomSource<Error = E>`.
 
 SDL3 implements the input, frame, and audio ports. The ROM test runner uses no-op frame and audio sinks because it only needs machine state assertions. Keeping these ports separate avoids a single frontend interface that must know about every possible input, display, audio, and testing concern.
+
+The application moves these output values from `StepResult` to the sinks. Format
+validation and ownership transfer retain the producers' `Vec` allocations; they
+do not clone frame or sample data. See the [core output contract](../rustboy-core/README.md#output-formats).
 
 ## Boundary
 

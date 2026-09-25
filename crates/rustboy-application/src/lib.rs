@@ -1,5 +1,7 @@
 use rustboy_core::mbc::Cartridge;
-use rustboy_core::{ButtonEvent, CpuDiagnostic, Machine, StepResult, CPU_FREQUENCY};
+use rustboy_core::{
+    AudioBuffer, ButtonEvent, CpuDiagnostic, Frame, Machine, StepResult, CPU_FREQUENCY,
+};
 use std::error::Error;
 use std::fmt;
 use std::thread::sleep;
@@ -8,13 +10,13 @@ use std::time::{Duration, Instant};
 pub trait FrameSink {
     type Error: Error + 'static;
 
-    fn present_frame(&mut self, frame: Vec<u8>) -> Result<(), Self::Error>;
+    fn present_frame(&mut self, frame: Frame) -> Result<(), Self::Error>;
 }
 
 pub trait AudioSink {
     type Error: Error + 'static;
 
-    fn queue_audio(&mut self, samples: Vec<i16>) -> Result<(), Self::Error>;
+    fn queue_audio(&mut self, samples: AudioBuffer) -> Result<(), Self::Error>;
 }
 
 pub trait InputSource {
@@ -176,7 +178,7 @@ mod test {
     impl FrameSink for FailingPlatform {
         type Error = io::Error;
 
-        fn present_frame(&mut self, _frame: Vec<u8>) -> Result<(), Self::Error> {
+        fn present_frame(&mut self, _frame: Frame) -> Result<(), Self::Error> {
             self.frames += 1;
             Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -188,7 +190,7 @@ mod test {
     impl AudioSink for FailingPlatform {
         type Error = io::Error;
 
-        fn queue_audio(&mut self, _samples: Vec<i16>) -> Result<(), Self::Error> {
+        fn queue_audio(&mut self, _samples: AudioBuffer) -> Result<(), Self::Error> {
             self.audio_buffers += 1;
             Err(io::Error::new(
                 io::ErrorKind::BrokenPipe,
@@ -289,7 +291,7 @@ mod test {
     impl FrameSink for TestOutputs {
         type Error = Infallible;
 
-        fn present_frame(&mut self, _frame: Vec<u8>) -> Result<(), Self::Error> {
+        fn present_frame(&mut self, _frame: Frame) -> Result<(), Self::Error> {
             self.frames += 1;
             Ok(())
         }
@@ -298,7 +300,7 @@ mod test {
     impl AudioSink for TestOutputs {
         type Error = Infallible;
 
-        fn queue_audio(&mut self, _samples: Vec<i16>) -> Result<(), Self::Error> {
+        fn queue_audio(&mut self, _samples: AudioBuffer) -> Result<(), Self::Error> {
             self.audio_buffers += 1;
             Ok(())
         }
