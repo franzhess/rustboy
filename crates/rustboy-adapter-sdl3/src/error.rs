@@ -1,3 +1,4 @@
+use sdl3::render::TextureValueError;
 use sdl3::video::WindowBuildError;
 use sdl3::IntegerOrSdlError;
 use std::error::Error;
@@ -9,6 +10,7 @@ pub enum InitError {
     Sdl(sdl3::Error),
     Window(WindowBuildError),
     LogicalSize(IntegerOrSdlError),
+    Texture(TextureValueError),
 }
 
 impl fmt::Display for InitError {
@@ -17,6 +19,7 @@ impl fmt::Display for InitError {
             Self::Sdl(error) => error.fmt(f),
             Self::Window(error) => error.fmt(f),
             Self::LogicalSize(error) => error.fmt(f),
+            Self::Texture(error) => error.fmt(f),
         }
     }
 }
@@ -27,6 +30,7 @@ impl Error for InitError {
             Self::Sdl(error) => Some(error),
             Self::Window(error) => Some(error),
             Self::LogicalSize(error) => Some(error),
+            Self::Texture(error) => Some(error),
         }
     }
 }

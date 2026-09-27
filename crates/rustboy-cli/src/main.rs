@@ -1,5 +1,5 @@
 use rustboy_adapter_rom::FileRomSource;
-use rustboy_adapter_sdl3::Sdl3Adapter;
+use rustboy_adapter_sdl3::{Sdl3Adapter, Sdl3Context};
 use rustboy_application::{run, RomSource, Session};
 use rustboy_core::{Machine, SCREEN_HEIGHT, SCREEN_WIDTH};
 
@@ -16,11 +16,15 @@ fn main() {
         });
     println!("Successfully loaded: {}", cartridge.name());
 
-    let mut adapter = Sdl3Adapter::new(2 * SCREEN_WIDTH as u32, 2 * SCREEN_HEIGHT as u32)
+    let mut context = Sdl3Context::new(2 * SCREEN_WIDTH as u32, 2 * SCREEN_HEIGHT as u32)
         .unwrap_or_else(|error| {
             eprintln!("Could not initialize SDL3: {error}");
             std::process::exit(1);
         });
+    let mut adapter = Sdl3Adapter::new(&mut context).unwrap_or_else(|error| {
+        eprintln!("Could not initialize SDL3 adapter: {error}");
+        std::process::exit(1);
+    });
     let mut session = Session::new(Machine::new(cartridge));
     if let Err(error) = adapter.play() {
         eprintln!("Could not start audio: {error}");

@@ -1,6 +1,6 @@
 # rustboy-cli
 
-`rustboy-cli` is the composition root for the desktop emulator. It is intentionally small: it parses the ROM path, creates the ROM and SDL3 adapters, creates a core machine/session, and starts the application run loop.
+`rustboy-cli` is the composition root for the desktop emulator. It is intentionally small: it parses the ROM path, creates the ROM adapter and an owning `Sdl3Context`, connects an `Sdl3Adapter` borrowing that context, creates a core machine/session, and starts the application run loop. The context outlives the adapter so its streaming texture always has a live creator and renderer.
 
 Run a ROM from the workspace root:
 
