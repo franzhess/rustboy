@@ -21,7 +21,7 @@ The original Game Boy is synchronized by a 4,194,304 Hz master clock. A **T-cycl
 
 The CPU, timer, PPU, and APU advance from the same T-cycle count. `Machine::step` lends the MMU to `Cpu::tick`, then passes the returned T-cycle total to the MMU's timer, PPU, and APU exactly once. Interrupt entry costs 20 T-cycles and idle costs 4; both advance these devices just as instructions do. This ties device progress to CPU execution rather than the host computer's wall clock. STOP and illegal-opcode idle currently use this same timing approximation.
 
-Frontends map emulated T-cycles to real time. The desktop application targets 4,194,304 T-cycles per second and sleeps only for the unused portion of each host frame. The APU uses a fractional sample clock so that 4,194,304 emulated T-cycles produce exactly 48,000 audio output frames per second, despite that ratio not being an integer.
+Frontends map emulated T-cycles to real time. The desktop application targets 4,194,304 T-cycles per nominal second using 60 time slices, carrying fractional cycles and instruction overshoot between slices. It sleeps only for the unused portion of each host time slice; these slices are independent of PPU video frames. The APU uses a fractional sample clock so that 4,194,304 emulated T-cycles produce exactly 48,000 audio output frames per second, despite that ratio not being an integer.
 
 ## Timing granularity
 

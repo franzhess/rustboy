@@ -73,11 +73,15 @@ pub enum RunState {
 
 pub struct Session {
     machine: Machine,
+    time_slice: TimeSliceBudget,
 }
 
 impl Session {
     pub fn new(machine: Machine) -> Self {
-        Self { machine }
+        Self {
+            machine,
+            time_slice: TimeSliceBudget::default(),
+        }
     }
 
     pub fn machine(&self) -> &Machine {
@@ -88,6 +92,7 @@ impl Session {
         &mut self.machine
     }
 
+    /// Executes an unpaced step, independently of time-slice accounting.
     pub fn step(&mut self) -> StepResult {
         self.machine.step()
     }
@@ -97,21 +102,54 @@ impl Session {
     }
 }
 
-pub const FRAME_CYCLE_BUDGET: usize = CPU_FREQUENCY / 60;
+/// Application pacing rate, independent of the PPU's video-frame cadence.
+pub const TIME_SLICES_PER_SECOND: usize = 60;
 
-fn frame_sleep_duration(elapsed: Duration) -> Duration {
-    (Duration::from_secs(1) / 60).saturating_sub(elapsed)
+#[derive(Default)]
+struct TimeSliceBudget {
+    // Positive: unfinished work. Negative: instruction overshoot credited to
+    // the next slice. Counts whole T-cycles, not host time.
+    remaining_cycles: i64,
+    // Fractional numerator carried when dividing CPU_FREQUENCY by the slice rate.
+    cycle_remainder: usize,
 }
 
-pub fn advance_frame(
+impl TimeSliceBudget {
+    fn begin_if_needed(&mut self) {
+        // An output error can interrupt a slice. A retry finishes its remaining
+        // budget instead of granting another slice's worth of emulated time.
+        if self.remaining_cycles > 0 {
+            return;
+        }
+        let numerator = self.cycle_remainder + CPU_FREQUENCY;
+        self.remaining_cycles += (numerator / TIME_SLICES_PER_SECOND) as i64;
+        self.cycle_remainder = numerator % TIME_SLICES_PER_SECOND;
+    }
+
+    fn record_step(&mut self, cycles: usize) {
+        self.remaining_cycles -= cycles as i64;
+    }
+}
+
+fn time_slice_sleep_duration(elapsed: Duration) -> Duration {
+    (Duration::from_secs(1) / TIME_SLICES_PER_SECOND as u32).saturating_sub(elapsed)
+}
+
+/// Advances one nominal 1/60-second slice, or resumes an interrupted slice.
+/// Returns cycles actually executed in this call; instruction overshoot and
+/// fractional budgets carry between slices. This function never sleeps.
+pub fn advance_time_slice(
     session: &mut Session,
     outputs: &mut (impl FrameSink + AudioSink),
     report_diagnostic: &mut impl FnMut(CpuDiagnostic),
 ) -> Result<usize, RunError> {
+    session.time_slice.begin_if_needed();
     let mut cycles = 0;
-    while cycles < FRAME_CYCLE_BUDGET {
+    while session.time_slice.remaining_cycles > 0 {
         let result = session.step();
         cycles += result.cycles;
+        // Account for execution before diagnostics/output can interrupt delivery.
+        session.time_slice.record_step(result.cycles);
         if let Some(diagnostic) = result.diagnostic {
             report_diagnostic(diagnostic);
         }
@@ -143,8 +181,8 @@ pub fn run(
         for event in platform.drain_input() {
             session.process_input(event);
         }
-        advance_frame(session, platform, &mut report_diagnostic)?;
-        sleep(frame_sleep_duration(slice_started.elapsed()));
+        advance_time_slice(session, platform, &mut report_diagnostic)?;
+        sleep(time_slice_sleep_duration(slice_started.elapsed()));
     }
     Ok(())
 }
@@ -251,8 +289,8 @@ mod test {
         let mut session = session_with_lcd(true);
         let mut platform = FailingPlatform::default();
 
-        let error =
-            advance_frame(&mut session, &mut platform, &mut |_| {}).expect_err("display fails");
+        let error = advance_time_slice(&mut session, &mut platform, &mut |_| {})
+            .expect_err("display fails");
 
         assert!(matches!(&error, RunError::Frame(_)));
         assert_io_cause(
@@ -273,7 +311,7 @@ mod test {
         let mut platform = FailingPlatform::default();
 
         let error =
-            advance_frame(&mut session, &mut platform, &mut |_| {}).expect_err("audio fails");
+            advance_time_slice(&mut session, &mut platform, &mut |_| {}).expect_err("audio fails");
 
         assert!(matches!(&error, RunError::Audio(_)));
         assert_io_cause(&error, io::ErrorKind::BrokenPipe, "audio disconnected");
@@ -308,31 +346,94 @@ mod test {
         }
     }
 
+    fn looping_session(program: &[u8]) -> Session {
+        let mut rom = vec![0; 0x8000];
+        rom[0x100..0x100 + program.len()].copy_from_slice(program);
+        Session::new(Machine::new(Cartridge::from_bytes(rom).expect("valid ROM")))
+    }
+
     #[test]
-    fn advance_frame_runs_a_full_cycle_budget_and_delivers_audio() {
+    fn cumulative_slice_cycles_stay_within_one_instruction_of_the_exact_target() {
+        // A 12-cycle JR loop and a mixed 4/12-cycle NOP/JR loop. Test two
+        // nominal seconds without run(), host clocks, sleeps or real devices.
+        for program in [&[0x18, 0xFE][..], &[0x00, 0x18, 0xFD][..]] {
+            let mut session = looping_session(program);
+            let mut outputs = TestOutputs::default();
+            let mut total_cycles = 0;
+            for slice in 1..=120 {
+                total_cycles += advance_time_slice(&mut session, &mut outputs, &mut |_| {})
+                    .expect("test sinks accept output");
+                let target = slice * CPU_FREQUENCY / 60;
+                assert!(
+                    total_cycles >= target && total_cycles < target + 12,
+                    "slice {slice}: executed {total_cycles}, target {target}"
+                );
+            }
+            // Two exact CPU-frequency budgets include the fractional cycles
+            // lost by repeatedly truncating CPU_FREQUENCY / 60.
+            assert!(total_cycles >= 2 * CPU_FREQUENCY);
+            assert_eq!(outputs.audio_buffers, 120);
+            assert!(outputs.frames > 0 && outputs.frames < 120);
+        }
+    }
+
+    #[test]
+    fn retry_after_output_failure_finishes_the_interrupted_slice() {
+        let mut reference = session_with_lcd(true);
+        let complete_cycles =
+            advance_time_slice(&mut reference, &mut TestOutputs::default(), &mut |_| {})
+                .expect("reference slice");
+        let mut session = session_with_lcd(true);
+        let error = advance_time_slice(&mut session, &mut FailingPlatform::default(), &mut |_| {})
+            .expect_err("frame sink fails before the slice ends");
+        assert!(matches!(error, RunError::Frame(_)));
+
+        let mut outputs = TestOutputs::default();
+        let remaining_cycles = advance_time_slice(&mut session, &mut outputs, &mut |_| {})
+            .expect("retry with working sinks");
+        assert!(remaining_cycles < complete_cycles);
+        assert_eq!(
+            session.machine().registers(),
+            reference.machine().registers()
+        );
+        for address in [0xFF04, 0xFF41, 0xFF44] {
+            assert_eq!(
+                session.machine().read_byte(address),
+                reference.machine().read_byte(address),
+                "register {address:04X}"
+            );
+        }
+        // Failed output is not replayed; audio generated while completing the
+        // remaining cycles is still delivered normally.
+        assert_eq!((outputs.frames, outputs.audio_buffers), (0, 1));
+    }
+
+    #[test]
+    fn advance_time_slice_runs_its_initial_budget_and_delivers_audio() {
         let cartridge = Cartridge::from_bytes(vec![0; 0x148]).expect("valid ROM header");
         let mut session = Session::new(Machine::new(cartridge));
         let mut outputs = TestOutputs::default();
 
-        let cycles = advance_frame(&mut session, &mut outputs, &mut |_| {})
+        let cycles = advance_time_slice(&mut session, &mut outputs, &mut |_| {})
             .expect("test outputs accept all effects");
 
-        assert!(cycles >= FRAME_CYCLE_BUDGET);
-        assert!(cycles <= FRAME_CYCLE_BUDGET + 24);
+        let initial_target = CPU_FREQUENCY / TIME_SLICES_PER_SECOND;
+        assert!(cycles >= initial_target);
+        assert!(cycles < initial_target + 24);
         assert_eq!(outputs.audio_buffers, 1);
     }
 
     #[test]
-    fn frame_sleep_only_waits_for_the_remaining_frame_budget() {
-        let frame = Duration::from_secs(1) / 60;
+    fn time_slice_sleep_only_waits_for_the_remaining_host_budget() {
+        let slice = Duration::from_secs(1) / 60;
 
-        assert_eq!(frame_sleep_duration(Duration::ZERO), frame);
+        assert_eq!(time_slice_sleep_duration(Duration::ZERO), slice);
         assert_eq!(
-            frame_sleep_duration(Duration::from_millis(5)),
-            frame - Duration::from_millis(5)
+            time_slice_sleep_duration(Duration::from_millis(5)),
+            slice - Duration::from_millis(5)
         );
         assert_eq!(
-            frame_sleep_duration(frame + Duration::from_millis(1)),
+            time_slice_sleep_duration(slice + Duration::from_millis(1)),
             Duration::ZERO
         );
     }
@@ -350,12 +451,15 @@ mod test {
         let mut session = session_with_illegal_opcode();
         let mut outputs = TestOutputs::default();
         let mut diagnostics = Vec::new();
-        for _ in 0..2 {
-            let cycles = advance_frame(&mut session, &mut outputs, &mut |diagnostic| {
+        let mut total_cycles = 0;
+        for slice in 1..=2 {
+            let cycles = advance_time_slice(&mut session, &mut outputs, &mut |diagnostic| {
                 diagnostics.push(diagnostic);
             })
             .expect("test outputs accept all effects");
-            assert!(cycles >= FRAME_CYCLE_BUDGET);
+            total_cycles += cycles;
+            let target = slice * CPU_FREQUENCY / TIME_SLICES_PER_SECOND;
+            assert!(total_cycles >= target && total_cycles < target + 4);
         }
         assert_eq!(
             diagnostics,
@@ -376,7 +480,7 @@ mod test {
         let mut session = session_with_illegal_opcode();
         let mut outputs = FailingPlatform::default();
         let mut diagnostics = Vec::new();
-        let error = advance_frame(&mut session, &mut outputs, &mut |diagnostic| {
+        let error = advance_time_slice(&mut session, &mut outputs, &mut |diagnostic| {
             diagnostics.push(diagnostic);
         })
         .expect_err("frame output fails");
