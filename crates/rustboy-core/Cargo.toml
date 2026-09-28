@@ -1,11 +1,11 @@
 [package]
 name = "rustboy-core"
-version = "0.1.0"
+version.workspace = true
 authors = ["Franz Hess <zylonenoger@gmail.com>"]
-edition = "2021"
-rust-version = "1.73"
+edition.workspace = true
+rust-version.workspace = true
 description = "Game Boy emulation core for Rustboy."
-license = "MIT"
+license.workspace = true
 repository = "https://github.com/franzhess/rustboy"
 keywords = ["game-boy", "emulator"]
 categories = ["emulators"]

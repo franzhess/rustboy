@@ -1,10 +1,10 @@
 [package]
 name = "rustboy-adapter-debugger-cli"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.73"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 description = "Terminal debugger adapter for Rustboy."
-license = "MIT"
+license.workspace = true
 
 [[bin]]
 name = "rustboy-debugger"
