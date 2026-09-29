@@ -1,7 +1,6 @@
 use crate::apu::Apu;
 use crate::joypad::Joypad;
-use crate::ppu::Ppu;
-use crate::ppu::VOAM_SIZE;
+use crate::ppu::{Ppu, OAM_SIZE};
 use crate::timer::Timer;
 
 use crate::mbc::Mbc;
@@ -22,7 +21,7 @@ pub struct Mmu {
     serial: Serial,
     interrupt_enable: u8,
     interrupt_request: u8,
-    voam_oam: u8,
+    oam_dma: u8,
 }
 
 impl Mmu {
@@ -38,7 +37,7 @@ impl Mmu {
             serial: Serial::new(),
             interrupt_enable: 0x00,
             interrupt_request: 0x00,
-            voam_oam: 0x00,
+            oam_dma: 0x00,
         }
     }
 
@@ -57,7 +56,7 @@ impl Mmu {
             0xFF04..=0xFF07 => self.timer.read_byte(address), //TIMER
             0xFF0F => self.interrupt_request | 0xE0,
             0xFF10..=0xFF3F => self.apu.read_byte(address), //sound
-            0xFF46 => self.voam_oam,
+            0xFF46 => self.oam_dma,
             0xFF40..=0xFF4B => self.ppu.read_byte(address),
             0xFF4C..=0xFF7F => 0xFF,
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80], //HRAM
@@ -84,10 +83,11 @@ impl Mmu {
             0xFF04..=0xFF07 => self.timer.write_byte(address, value),        //timer
             0xFF0F => self.interrupt_request = value & 0x1F,
             0xFF10..=0xFF3F => self.apu.write_byte(address, value), //sound
+            // DMA belongs to the MMU; intercept FF46 before the PPU register range.
             0xFF46 => {
-                self.voam_oam = value;
-                self.copy_to_voam(value)
-            } //it's in front to capture it before it reaches the next line
+                self.oam_dma = value;
+                self.copy_to_oam(value)
+            }
             0xFF40..=0xFF4B => self.ppu.write_byte(address, value),
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
             0xFFFF => self.interrupt_enable = value,
@@ -131,12 +131,14 @@ impl Mmu {
             self.interrupt_request |= 0x04;
         }
 
-        //@TODO add joypad and serial interrupts
+        // TODO: Forward joypad and serial interrupt requests.
     }
 
-    fn copy_to_voam(&mut self, value: u8) {
+    /// Copies OAM_SIZE bytes from the selected source page immediately.
+    /// DMA bus timing is not modeled.
+    fn copy_to_oam(&mut self, value: u8) {
         let mem_start = (value as u16) << 8;
-        for offset in 0..VOAM_SIZE {
+        for offset in 0..OAM_SIZE {
             self.write_byte(
                 0xFE00 + offset as u16,
                 self.read_byte(mem_start + offset as u16),
@@ -276,37 +278,3 @@ mod tests {
         }
     }
 }
-
-/*
-    buffer[0xFF05] = 0x00; // TIMA
-    buffer[0xFF06] = 0x00; // TMA
-    buffer[0xFF07] = 0x00; // TAC
-    buffer[0xFF10] = 0x80; // NR10
-    buffer[0xFF11] = 0xBF; // NR11
-    buffer[0xFF12] = 0xF3; // NR12
-    buffer[0xFF14] = 0xBF; // NR14
-    buffer[0xFF16] = 0x3F; // NR21
-    buffer[0xFF17] = 0x00; // NR22
-    buffer[0xFF19] = 0xBF; // NR24
-    buffer[0xFF1A] = 0x7F; // NR30
-    buffer[0xFF1B] = 0xFF; // NR31
-    buffer[0xFF1C] = 0x9F; // NR32
-    buffer[0xFF1E] = 0xBF; // NR33
-    buffer[0xFF20] = 0xFF; // NR41
-    buffer[0xFF21] = 0x00; // NR42
-    buffer[0xFF22] = 0x00; // NR43
-    buffer[0xFF23] = 0xBF; // NR30
-    buffer[0xFF24] = 0x77; // NR50
-    buffer[0xFF25] = 0xF3; // NR51
-    buffer[0xFF26] = 0xF1; //-GB, 0xF0-SGB // NR52
-    buffer[0xFF40] = 0x91; // LCDC
-    buffer[0xFF42] = 0x00; // SCY
-    buffer[0xFF43] = 0x00; // SCx
-    buffer[0xFF45] = 0x00; // LYC
-    buffer[0xFF47] = 0xFC; // BGP
-    buffer[0xFF48] = 0xFF; // OBP0
-    buffer[0xFF49] = 0xFF; // OBP1
-    buffer[0xFF4A] = 0x00; // WY
-    buffer[0xFF4B] = 0x00; // Wx
-    buffer[0xFFFF] = 0x00; // IE
-*/

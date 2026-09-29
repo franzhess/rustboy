@@ -3,7 +3,7 @@ use crate::SCREEN_HEIGHT;
 use crate::SCREEN_WIDTH;
 
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
-pub const VOAM_SIZE: usize = 0xA0;
+pub const OAM_SIZE: usize = 0xA0; // 40 sprites * 4 attribute bytes.
 
 /// LCD modes, with discriminants matching STAT bits 0–1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +25,7 @@ pub struct Ppu {
 
     clock: usize,
     vram: [u8; VRAM_SIZE],
-    voam: [u8; VOAM_SIZE],
+    oam: [u8; OAM_SIZE],
     lcd_enabled: bool,               //FF40
     window_tilemap_select: bool,     //FF40 - false = 9800-9BFF / true = 9C00-9FFF
     window_enable: bool,             //FF40
@@ -63,7 +63,7 @@ impl Ppu {
             irq_stat: false,
             clock: 0, // for the first line
             vram: [0; VRAM_SIZE],
-            voam: [0; VOAM_SIZE],
+            oam: [0; OAM_SIZE],
             lcd_enabled: true,
             window_tilemap_select: false,
             window_enable: false,
@@ -97,7 +97,7 @@ impl Ppu {
             }
             0xFE00..=0xFE9F => {
                 let offset = address as usize - 0xFE00;
-                self.voam[offset]
+                self.oam[offset]
             }
             0xFF40 => {
                 // LCD Control
@@ -152,7 +152,7 @@ impl Ppu {
             }
             0xFE00..=0xFE9F => {
                 let offset = address as usize - 0xFE00;
-                self.voam[offset] = value;
+                self.oam[offset] = value;
             }
             0xFF40 => {
                 self.lcd_enabled = value & 0x80 == 0x80;
@@ -224,7 +224,7 @@ impl Ppu {
             while self.clock >= 456 {
                 //advance one line
                 self.clock -= 456;
-                self.line = (self.line + 1) % 154; //154 = 144 physical lines + 10 imaginary vblank lines
+                self.line = (self.line + 1) % 154; // 144 visible lines + 10 VBlank lines.
 
                 if self.irq_lyc_enable {
                     self.irq_stat = self.line == self.line_compare;
@@ -337,7 +337,7 @@ impl Ppu {
     }
 
     fn render_window(&mut self) {
-        //@TODO implement
+        // TODO: Implement window rendering.
     }
 
     fn render_sprites(&mut self) {
@@ -345,15 +345,15 @@ impl Ppu {
             //draw from the back to the front for sprite priority
             let sprite_address = (39 - sprite_num) * 4;
 
-            let y = self.voam[sprite_address] as usize;
-            let x = self.voam[sprite_address + 1] as usize;
+            let y = self.oam[sprite_address] as usize;
+            let x = self.oam[sprite_address + 1] as usize;
 
             let line = self.line as usize + 16;
             if y > 0 && y < 160 && x > 0 && x < 168 {
                 //otherwise the sprite is hidden
                 if line >= y && line < (y + self.sprite_size) {
-                    let sprite_id = self.voam[sprite_address + 2];
-                    let sprite_attributes = self.voam[sprite_address + 3];
+                    let sprite_id = self.oam[sprite_address + 2];
+                    let sprite_attributes = self.oam[sprite_address + 3];
 
                     let palette = if sprite_attributes & 0x10 == 0x10 {
                         self.obj_palette_2
@@ -405,7 +405,6 @@ impl Ppu {
     }
 
     fn sprite_row(first: u8, second: u8) -> [u8; 8] {
-        //println!("{:#06X} {:#06X}", first, second);
         let mut result = [0u8; 8];
         for (i, color) in result.iter_mut().enumerate() {
             let bit_index = 7 - i; // bit 7 left most bit 0 right most
@@ -530,8 +529,8 @@ mod test {
     #[test]
     fn renders_the_visible_edge_of_a_left_clipped_sprite() {
         let mut ppu = Ppu::new();
-        ppu.voam[156] = 16;
-        ppu.voam[157] = 1;
+        ppu.oam[156] = 16;
+        ppu.oam[157] = 1;
         ppu.vram[0] = 0b0000_0001;
 
         ppu.render_sprites();
@@ -542,9 +541,9 @@ mod test {
     #[test]
     fn vertically_flipped_sprite_uses_its_bottom_source_row_first() {
         let mut ppu = Ppu::new();
-        ppu.voam[156] = 16;
-        ppu.voam[157] = 8;
-        ppu.voam[159] = 0x40;
+        ppu.oam[156] = 16;
+        ppu.oam[157] = 8;
+        ppu.oam[159] = 0x40;
         ppu.obj_palette_1 = 0b1110_0100;
         ppu.vram[0] = 0b1000_0000;
         ppu.vram[15] = 0b1000_0000;

@@ -175,17 +175,19 @@ device tests exercise consuming requests and raising subsequent ones.
 
 ### OAM DMA
 
-Writing a byte to `FF46` selects source address `value << 8`. The MMU immediately
-copies `0xA0` bytes from there into `FE00–FE9F`. This reproduces the bulk copy,
+Writing a byte to `FF46` selects source address `value << 8`. The MMU stores that
+byte in `oam_dma` for register readback, then `copy_to_oam` immediately copies
+`OAM_SIZE` (`0xA0`) bytes from there into `FE00–FE9F`. This reproduces the bulk copy,
 not hardware DMA timing: transfers are not spread over 160 M-cycles, and CPU bus
 restrictions during DMA are not modeled.
 
 ## Display (PPU)
 
-[`src/ppu.rs`](src/ppu.rs) owns 8 KiB of VRAM and 160 bytes of OAM. Each of the
-40 sprite entries has four bytes: Y, X, tile number, and attributes. Hardware sprite
-coordinates include offsets of +16 vertically and +8 horizontally; clipping must
-account for these rather than allowing subtraction to wrap.
+[`src/ppu.rs`](src/ppu.rs) owns 8 KiB of VRAM and a 160-byte `oam` array
+(object attribute memory). Each of the 40 sprite entries has four bytes: Y, X,
+tile number, and attributes. Hardware sprite coordinates include offsets of +16
+vertically and +8 horizontally; clipping must account for these rather than allowing
+subtraction to wrap.
 
 | Register | Function |
 | --- | --- |

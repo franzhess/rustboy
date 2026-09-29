@@ -127,7 +127,9 @@ pub fn add_next_signed_byte_to_word(flag_register: &mut Flags, value1: u16, valu
 }
 
 pub fn daa(flag_register: &mut Flags, value: u8) -> u8 {
-    //i got no idea what i'm doing
+    // Adjust packed BCD using the preceding operation's carry/half-carry flags.
+    // Addition also checks the result's decimal limits; subtraction reverses
+    // the corrections indicated by the saved flags.
     let mut adjust = if flag_register.get_flag(CpuFlag::C) {
         0x60
     } else {
@@ -175,7 +177,7 @@ fn rotate_left_through_carry(
             0x01
         } else {
             0x00
-        }; //push one to the right and add the carry to the right
+        }; // Shift left and insert the previous carry into bit 0.
     flag_update_function(flag_register, result, new_carry);
     result
 }
@@ -185,7 +187,7 @@ pub fn rl(flag_register: &mut Flags, value: u8) -> u8 {
     rotate_left_through_carry(flag_register, value, shift_operation_flag_update)
 }
 
-//rla, rlca, rra and rrca don't set the Z flag - different to the CB instructions
+// Accumulator rotations clear Z; CB rotations set Z according to the result.
 pub fn rla(flag_register: &mut Flags, value: u8) -> u8 {
     //rotate left through carry
     rotate_left_through_carry(flag_register, value, shift_operation_flag_update_without_z)
@@ -259,9 +261,8 @@ pub fn rrca(flag_register: &mut Flags, value: u8) -> u8 {
     rotate_right(flag_register, value, shift_operation_flag_update_without_z)
 }
 
-//difference between shift and rotate is, that we don't add the pushed out bit on the other side
 pub fn sla(flag_register: &mut Flags, value: u8) -> u8 {
-    //shift left arithmetic (b0=0)
+    // Shift left, clearing bit 0.
     let new_carry = (value & 0x80) == 0x80;
     let result = value << 1;
     shift_operation_flag_update(flag_register, result, new_carry);
@@ -269,7 +270,7 @@ pub fn sla(flag_register: &mut Flags, value: u8) -> u8 {
 }
 
 pub fn sra(flag_register: &mut Flags, value: u8) -> u8 {
-    //shift left arithmetic (b0=0)
+    // Shift right arithmetically, preserving the sign bit.
     let new_carry = (value & 0x01) == 0x01;
     let result = (value >> 1) | (value & 0x80);
     shift_operation_flag_update(flag_register, result, new_carry);
@@ -277,7 +278,7 @@ pub fn sra(flag_register: &mut Flags, value: u8) -> u8 {
 }
 
 pub fn srl(flag_register: &mut Flags, value: u8) -> u8 {
-    //shift left arithmetic (b0=0)
+    // Shift right logically, clearing bit 7.
     let new_carry = (value & 0x01) == 0x01;
     let result = value >> 1;
     shift_operation_flag_update(flag_register, result, new_carry);
@@ -285,21 +286,21 @@ pub fn srl(flag_register: &mut Flags, value: u8) -> u8 {
 }
 
 pub fn ccf(flag_register: &mut Flags) {
-    //compliment carry flag
+    // Complement C; preserve Z and clear N/H.
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, false);
     flag_register.set_flag(CpuFlag::C, !flag_register.get_flag(CpuFlag::C));
 }
 
 pub fn scf(flag_register: &mut Flags) {
-    //set carry flag
+    // Set C; preserve Z and clear N/H.
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, false);
     flag_register.set_flag(CpuFlag::C, true);
 }
 
 pub fn bit(flag_register: &mut Flags, bit: u8, value: u8) {
-    //check bit at
+    // Z reflects a clear tested bit; preserve C, clear N and set H.
     flag_register.set_flag(CpuFlag::Z, (value & (1 << bit)) == 0);
     flag_register.set_flag(CpuFlag::N, false);
     flag_register.set_flag(CpuFlag::H, true);
