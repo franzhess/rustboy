@@ -145,6 +145,8 @@ fn main() {
     let video_and_audio = measure(&mut video_and_audio_machine);
     assert_eq!(audio_only.cycles, video_and_audio.cycles);
     assert_eq!(audio_only.audio_buffers, video_and_audio.audio_buffers);
+    assert_eq!(audio_only.allocator.reallocations, 0);
+    assert_eq!(video_and_audio.allocator.reallocations, 0);
 
     let video = Measurement {
         allocator: video_and_audio.allocator.subtract(audio_only.allocator),

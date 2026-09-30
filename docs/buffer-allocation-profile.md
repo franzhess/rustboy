@@ -37,19 +37,28 @@ The second run produced identical counters.
   requested bytes per emulated second. Output wrappers and application delivery do
   not copy either payload.
 
-## Follow-up optimization task
+## Optimization result
 
-Pre-size the core's output producer vectors without changing output ownership or
-public APIs:
+The producer vectors were pre-sized without changing output ownership or public
+APIs. The PPU now reserves `Frame::PIXEL_COUNT` before copying its rows, and the
+APU starts each sample buffer with `AUDIO_BUFFER_SAMPLES` capacity.
 
-1. Build each PPU frame in a vector with `Frame::PIXEL_COUNT` capacity so frame
-   production performs no growth reallocations.
-2. Replace the completed APU sample vector with a new vector preallocated for
-   `AUDIO_BUFFER_SAMPLES` instead of replacing it with an empty allocation.
-3. Rerun this probe and require zero payload growth reallocations, unchanged output
-   counts, and unchanged workspace tests.
+| Output | Count (10 s) | Allocations | Reallocations | Requested bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Audio | 600 buffers | 1,200 | 0 | 1,977,600 |
+| Video | 597 frames | 597 | 0 | 13,754,880 |
+| Combined | 597 frames, 600 buffers | 1,797 | 0 | 15,732,480 |
+
+The repeated optimized run produced identical counters. Compared with the baseline,
+the changes eliminate all 10,176 reallocations, reduce allocation/reallocation calls
+by 85.0%, and reduce requested sizes by 70.7%. Output counts are unchanged.
+
+- Each frame now makes one exact 23,040-byte payload allocation.
+- Each audio buffer makes one 3,200-byte payload allocation and one 96-byte outer
+  `Vec<AudioBuffer>` allocation.
+- Combined production averages 179.7 allocations and 1,573,248 requested bytes per
+  emulated second.
 
 The remaining allocation for each owned frame and audio payload is expected. The
-small outer `Vec<AudioBuffer>` allocation can be assessed separately after the
-payload growth is removed; changing `StepResult` solely to eliminate it is not yet
-justified.
+small outer `Vec<AudioBuffer>` allocation does not justify changing `StepResult`
+solely to eliminate it.

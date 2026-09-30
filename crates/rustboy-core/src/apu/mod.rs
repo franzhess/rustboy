@@ -34,7 +34,7 @@ impl Apu {
             enabled: true,
             audio_buffers: Vec::new(),
             sample_clock: SampleClock::new(),
-            buffer: vec![],
+            buffer: Vec::with_capacity(AUDIO_BUFFER_SAMPLES),
             timer_counter: 0,
             timer_step: 0,
             channel_1: Tone::new(),
@@ -113,7 +113,8 @@ impl Apu {
             self.buffer.push(right);
 
             if self.buffer.len() >= AUDIO_BUFFER_SAMPLES {
-                let samples = std::mem::take(&mut self.buffer);
+                let samples =
+                    std::mem::replace(&mut self.buffer, Vec::with_capacity(AUDIO_BUFFER_SAMPLES));
                 self.audio_buffers.push(
                     AudioBuffer::try_from(samples)
                         .expect("APU emits complete left/right sample pairs"),

@@ -187,12 +187,10 @@ impl Ppu {
     }
 
     pub fn get_screen_buffer(&self) -> Frame {
-        let pixels: Vec<u8> = self
-            .screen_buffer
-            .iter()
-            .flat_map(|array| array.iter())
-            .cloned()
-            .collect();
+        let mut pixels = Vec::with_capacity(Frame::PIXEL_COUNT);
+        for row in &self.screen_buffer {
+            pixels.extend_from_slice(row);
+        }
         Frame::try_from(pixels).expect("PPU renders one screen of valid DMG shades")
     }
 
