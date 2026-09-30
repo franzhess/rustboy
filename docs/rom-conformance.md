@@ -1,5 +1,30 @@
 # ROM conformance baseline
 
+## Fresh OAM DMA timing — 2026-09-30
+
+OAM DMA now has a two-M-cycle startup followed by 160 one-byte transfer M-cycles.
+CPU OAM accesses remain available for the first M-cycle after `FF46`, then active
+DMA returns `FF` for reads and ignores writes. Internal DMA accesses bypass the CPU
+gate, and `FF46` readback remains independent from transfer state.
+
+The eligible Mooneye acceptance result is now **41/62**, with **23/29** direct tests
+passing. `acceptance/oam_dma_start` and `acceptance/oam_dma_timing` newly pass, while
+`acceptance/oam_dma/basic` and `acceptance/oam_dma/reg_read` remain passing. Restart
+source replacement and source-page aliases remain separately scoped failures.
+
+## CPU M-cycle bus seam — 2026-09-30
+
+Normal CPU instructions now advance devices through individual bus and internal
+M-cycles instead of one post-instruction batch. Multi-byte reads are split into byte
+operations; interrupt entry remains instruction-batched pending its dedicated fix.
+
+The eligible Mooneye acceptance baseline improved from **30/62** to **39/62** with
+no regressions. `pop_timing`, `add_sp_e_timing`, `ld_hl_sp_e_timing`, `jp_timing`,
+`jp_cc_timing`, `call_timing`, `call_cc_timing`, `ret_timing`, and `reti_timing`
+now pass. POP's low and high stack reads occur on separate M-cycles and observe the
+intervening DIV edge. Workspace tests cover every legal opcode's total duration;
+focused tests also cover device advancement and split POP reads.
+
 ## MBC ROM time allowance — 2026-09-20
 
 The runner now gives opcode-based Mooneye `emulator-only/mbc1`, `mbc2`, and `mbc5` tests

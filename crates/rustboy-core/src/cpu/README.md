@@ -187,9 +187,9 @@ preserve flags. Accumulator rotations clear Z, unlike their CB counterparts.
 
 The eleven illegal slots are `D3 DB DD E3 E4 EB EC ED F4 FC FD`; they return
 `UnknownOpcode`. Special cases retain their existing EI/DI/RETI/HALT/STOP behavior.
-Conditional branches preserve the current implementation's fetch behavior:
-untaken JR/JP/CALL advance PC over the immediate operand without reading it.
-This is an instruction-level model, not a claim about hardware bus ordering.
+Conditional JR, JP, and CALL fetch their immediate operand bytes on both taken and
+untaken paths. Taken-path internal cycles are still generally filled after the
+handler's explicit bus operations rather than individually specialized.
 
 ### CB-prefixed groups
 

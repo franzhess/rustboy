@@ -9,6 +9,15 @@ use crate::{AudioBuffer, ButtonEvent, Frame};
 
 const WRAM_SIZE: usize = 0x8000;
 const HRAM_SIZE: usize = 0x7F;
+const OAM_DMA_STARTUP_M_CYCLES: u8 = 2;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OamDmaState {
+    Inactive,
+    Starting { source: u16, remaining_mcycles: u8 },
+    Active { source: u16, offset: usize },
+    Finishing,
+}
 
 pub struct Mmu {
     wram: [u8; WRAM_SIZE],
@@ -22,6 +31,7 @@ pub struct Mmu {
     interrupt_enable: u8,
     interrupt_request: u8,
     oam_dma: u8,
+    oam_dma_state: OamDmaState,
 }
 
 impl Mmu {
@@ -38,6 +48,7 @@ impl Mmu {
             interrupt_enable: 0x00,
             interrupt_request: 0x00,
             oam_dma: 0x00,
+            oam_dma_state: OamDmaState::Inactive,
         }
     }
 
@@ -64,6 +75,14 @@ impl Mmu {
         }
     }
 
+    pub(crate) fn read_cpu_byte(&self, address: u16) -> u8 {
+        if self.oam_dma_active() && (0xFE00..=0xFE9F).contains(&address) {
+            0xFF
+        } else {
+            self.read_byte(address)
+        }
+    }
+
     #[cfg(test)]
     pub fn read_word(&self, address: u16) -> u16 {
         //LSB FIRST
@@ -87,12 +106,18 @@ impl Mmu {
             // DMA belongs to the MMU; intercept FF46 before the PPU register range.
             0xFF46 => {
                 self.oam_dma = value;
-                self.copy_to_oam(value)
+                self.start_oam_dma(value);
             }
             0xFF40..=0xFF4B => self.ppu.write_byte(address, value),
             0xFF80..=0xFFFE => self.hram[address as usize - 0xFF80] = value, //HRAM
             0xFFFF => self.interrupt_enable = value,
             _ => {}
+        }
+    }
+
+    pub(crate) fn write_cpu_byte(&mut self, address: u16, value: u8) {
+        if !self.oam_dma_active() || !(0xFE00..=0xFE9F).contains(&address) {
+            self.write_byte(address, value);
         }
     }
 
@@ -102,6 +127,9 @@ impl Mmu {
     }
 
     pub fn do_ticks(&mut self, ticks: usize) {
+        for _ in 0..ticks / 4 {
+            self.advance_oam_dma();
+        }
         self.timer.do_ticks(ticks);
         self.ppu.do_ticks(ticks);
         self.apu.do_ticks(ticks);
@@ -135,22 +163,53 @@ impl Mmu {
         // TODO: Forward joypad and serial interrupt requests.
     }
 
-    /// Copies OAM_SIZE bytes from the selected source page immediately.
-    /// DMA bus timing is not modeled.
-    fn copy_to_oam(&mut self, value: u8) {
-        let mem_start = (value as u16) << 8;
-        for offset in 0..OAM_SIZE {
-            self.write_byte(
-                0xFE00 + offset as u16,
-                self.read_byte(mem_start + offset as u16),
-            );
+    fn start_oam_dma(&mut self, value: u8) {
+        if !self.oam_dma_active() {
+            self.oam_dma_state = OamDmaState::Starting {
+                source: u16::from(value) << 8,
+                remaining_mcycles: OAM_DMA_STARTUP_M_CYCLES,
+            };
         }
+    }
+
+    fn advance_oam_dma(&mut self) {
+        self.oam_dma_state = match self.oam_dma_state {
+            OamDmaState::Inactive => OamDmaState::Inactive,
+            OamDmaState::Starting {
+                source,
+                remaining_mcycles: 1,
+            } => OamDmaState::Active { source, offset: 0 },
+            OamDmaState::Starting {
+                source,
+                remaining_mcycles,
+            } => OamDmaState::Starting {
+                source,
+                remaining_mcycles: remaining_mcycles - 1,
+            },
+            OamDmaState::Active { source, offset } => {
+                let value = self.read_byte(source.wrapping_add(offset as u16));
+                self.ppu.write_byte(0xFE00 + offset as u16, value);
+                if offset + 1 == OAM_SIZE {
+                    OamDmaState::Finishing
+                } else {
+                    OamDmaState::Active {
+                        source,
+                        offset: offset + 1,
+                    }
+                }
+            }
+            OamDmaState::Finishing => OamDmaState::Inactive,
+        };
+    }
+
+    fn oam_dma_active(&self) -> bool {
+        matches!(self.oam_dma_state, OamDmaState::Active { .. })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Mmu;
+    use super::{Mmu, OamDmaState, OAM_SIZE};
     use crate::mbc::Mbc;
 
     struct TestMbc;
@@ -167,6 +226,57 @@ mod tests {
         fn write_rom(&mut self, _address: u16, _value: u8) {}
 
         fn write_ram(&mut self, _address: u16, _value: u8) {}
+    }
+
+    fn mmu_without_lcd() -> Mmu {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+        mmu.write_byte(0xFF40, 0);
+        mmu
+    }
+
+    #[test]
+    fn fresh_dma_allows_one_mcycle_before_blocking_oam() {
+        let mut mmu = mmu_without_lcd();
+        mmu.write_byte(0xC000, 0x42);
+        mmu.write_byte(0xFE00, 0x11);
+
+        mmu.write_cpu_byte(0xFF46, 0xC0);
+        mmu.do_ticks(4); // FF46 write M-cycle.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0x11);
+
+        mmu.do_ticks(4); // First M-cycle after the write remains accessible.
+        assert!(matches!(
+            mmu.oam_dma_state,
+            OamDmaState::Active { offset: 0, .. }
+        ));
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.write_cpu_byte(0xFE00, 0x22);
+        assert_eq!(mmu.read_byte(0xFE00), 0x11);
+
+        mmu.do_ticks(4);
+        assert_eq!(mmu.read_byte(0xFE00), 0x42);
+    }
+
+    #[test]
+    fn dma_transfers_one_byte_per_mcycle_and_unblocks_after_160() {
+        let mut mmu = mmu_without_lcd();
+        for offset in 0..OAM_SIZE {
+            mmu.write_byte(0xC000 + offset as u16, offset as u8 + 1);
+        }
+
+        mmu.write_cpu_byte(0xFF46, 0xC0);
+        mmu.do_ticks(8);
+        mmu.do_ticks((OAM_SIZE - 1) * 4);
+
+        assert_eq!(mmu.read_byte(0xFE9E), 0x9F);
+        assert_eq!(mmu.read_byte(0xFE9F), 0);
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+
+        mmu.do_ticks(4);
+        assert_eq!(mmu.read_byte(0xFE9F), 0xA0);
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 1);
+        assert_eq!(mmu.read_byte(0xFF46), 0xC0);
+        assert_eq!(mmu.oam_dma_state, OamDmaState::Finishing);
     }
 
     #[test]

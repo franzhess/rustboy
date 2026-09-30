@@ -21,13 +21,13 @@ impl<'a> CpuBus<'a> {
     }
 
     pub(super) fn read_byte(&mut self, address: u16) -> u8 {
-        let value = self.mmu.read_byte(address);
+        let value = self.mmu.read_cpu_byte(address);
         self.idle_mcycle();
         value
     }
 
     pub(super) fn write_byte(&mut self, address: u16, value: u8) {
-        self.mmu.write_byte(address, value);
+        self.mmu.write_cpu_byte(address, value);
         self.idle_mcycle();
     }
 

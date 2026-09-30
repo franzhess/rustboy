@@ -54,6 +54,17 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   `acceptance/interrupts/ie_push` still fails; interrupt dispatch does not yet model changes
   to IE during the stack writes of the interrupt-entry sequence.
 
+## DMA Notes
+
+- Fresh OAM DMA has a two-M-cycle startup: the `FF46` write M-cycle and one following
+  accessible M-cycle. It then copies one byte per M-cycle for 160 M-cycles.
+- Active DMA makes CPU OAM reads and opcode fetches return `FF` and ignores CPU OAM writes.
+  DMA-internal accesses and untimed inspection bypass this CPU gate.
+- Active-transfer `FF46` writes update readback but replacement-source restart timing is not
+  yet modeled. DMG source-page aliases are also pending.
+- Mooneye `oam_dma_start`, `oam_dma_timing`, `oam_dma/basic`, and `oam_dma/reg_read` pass.
+  `oam_dma_restart` and `oam_dma/sources-GS` still fail.
+
 ## EI and HALT Notes
 
 - EI takes effect after the following instruction completes. Repeated EI does not postpone
@@ -63,15 +74,15 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   Otherwise HALT waits for an enabled request; with IME clear it resumes without servicing it.
 - EI followed by HALT with a request already pending saves the HALT address on interrupt entry
   and clears the fetch-suppression flag before the handler runs.
-- Mooneye `ei_sequence`, `ei_timing`, `rapid_di_ei`, `di_timing-GS`, and all four direct
-  `acceptance/halt_*` tests pass. `reti_timing` still fails; its stack reads need explicit phases.
+- Mooneye `ei_sequence`, `ei_timing`, `rapid_di_ei`, `di_timing-GS`, `reti_timing`, and all
+  four direct `acceptance/halt_*` tests pass.
 - The EI/HALT integration makes `gbmicrotest/halt_op_dupe` and `int_hblank_halt_bug_b` pass,
   but changes `gbmicrotest/halt_bug` from passing to failing. That test sums timer reads:
   it now reports `0x16` instead of `0x14`. The old path incorrectly executed the post-HALT
   INC only once; the corrected path executes it twice. Investigate the remaining timing
   mismatch rather than removing fetch suppression. The opcode-duration audit corrected
   JP a16 to 16 T-cycles and ADD A,(HL) to 8, plus LD (HL+),A, SUB/CP (HL), and all CB (HL)
-  durations. `gbmicrotest/halt_bug` still fails and `acceptance/jp_timing` still times out.
+  durations. `gbmicrotest/halt_bug` still fails; `acceptance/jp_timing` now passes.
   All legal base and CB opcode durations are covered by unit tests across all flag combinations;
   this verifies instruction totals, not the ordering of bus operations within an instruction.
 

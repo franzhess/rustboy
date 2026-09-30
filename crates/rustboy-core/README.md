@@ -176,10 +176,16 @@ device tests exercise consuming requests and raising subsequent ones.
 ### OAM DMA
 
 Writing a byte to `FF46` selects source address `value << 8`. The MMU stores that
-byte in `oam_dma` for register readback, then `copy_to_oam` immediately copies
-`OAM_SIZE` (`0xA0`) bytes from there into `FE00–FE9F`. This reproduces the bulk copy,
-not hardware DMA timing: transfers are not spread over 160 M-cycles, and CPU bus
-restrictions during DMA are not modeled.
+byte independently for register readback and starts a two-M-cycle startup sequence.
+The write occupies the first M-cycle, the following M-cycle still allows CPU OAM
+access, and DMA becomes active after it. Active DMA copies one byte into `FE00–FE9F`
+per M-cycle for 160 M-cycles.
+
+CPU OAM reads, including opcode fetches, return `FF` while DMA is active; CPU OAM
+writes are ignored. DMA uses raw internal source reads and OAM writes so it does not
+block itself, while untimed inspection remains raw. A write to `FF46` during an active
+transfer updates readback but does not yet schedule the replacement source; restart
+timing and DMG source-page aliases remain future work.
 
 ## Display (PPU)
 
