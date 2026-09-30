@@ -1,4 +1,4 @@
-use super::{opcodes, tests::machine_with_program, OpcodeResult};
+use super::{bus::CpuBus, opcodes, tests::machine_with_program, OpcodeResult};
 use crate::Machine;
 
 // SM83 instruction durations in T-cycles, with conditional branches NOT taken.
@@ -49,8 +49,9 @@ fn every_base_opcode_has_the_documented_duration_for_all_flag_combinations() {
             // Immediate word targets WRAM; STOP consumes its mandatory zero byte.
             let mut machine = machine(&[opcode, 0, 0xC4], flags);
             if base == 0 {
+                let mut bus = CpuBus::new(&mut machine.mmu);
                 assert!(matches!(
-                    opcodes::execute(opcode, &mut machine.cpu, &mut machine.mmu),
+                    opcodes::execute(opcode, &mut machine.cpu, &mut bus),
                     OpcodeResult::UnknownOpcode
                 ));
                 continue;

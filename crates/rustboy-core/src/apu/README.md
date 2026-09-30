@@ -47,8 +47,9 @@ The APU has three distinct timing responsibilities:
 3. A **48 kHz output sample clock** decides when to emit stereo samples to the host.
 
 `Apu::do_ticks` currently advances the frame sequencer first, then the four channel
-timers, then emits samples from their resulting state. This is instruction-batched
-processing, not event-by-event interleaving of every channel edge and output sample.
+timers, then emits samples from their resulting state. CPU execution now calls this
+in M-cycle-sized batches, but processing within each call is not event-by-event
+interleaving of every channel edge and output sample.
 
 ### Frame sequencer
 

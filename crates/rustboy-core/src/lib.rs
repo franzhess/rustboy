@@ -74,11 +74,9 @@ impl Machine {
 
     pub fn step(&mut self) -> StepResult {
         // Requests from the preceding step are collected before CPU dispatch.
-        // Devices then advance by this step's total, exactly once, before output
-        // collection. Bus accesses are still instruction-batched, not M-cycle scheduled.
+        // CPU execution advances devices through its M-cycles before output collection.
         self.mmu.process_irq_requests();
         let result = self.cpu.tick(&mut self.mmu);
-        self.mmu.do_ticks(result.cycles);
         StepResult {
             cycles: result.cycles,
             opcode: result.opcode,
@@ -139,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn devices_advance_after_cpu_bus_accesses() {
+    fn cpu_bus_samples_observe_preceding_mcycles() {
         let mut machine = machine_with_program(&[0xF0, 0x04]); // LDH A,(DIV)
         machine.mmu.do_ticks(252);
         assert_eq!(machine.read_byte(0xFF04), 0);
@@ -147,7 +145,7 @@ mod tests {
         let result = machine.step();
 
         assert_eq!((result.cycles, result.opcode), (12, Some(0xF0)));
-        assert_eq!(machine.registers().a, 0); // Read before the divider advances.
+        assert_eq!(machine.registers().a, 1); // Opcode and operand M-cycles preceded the read.
         assert_eq!(machine.read_byte(0xFF04), 1);
     }
 

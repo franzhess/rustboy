@@ -1,4 +1,5 @@
 mod alu;
+mod bus;
 mod flags;
 mod opcodes;
 mod operand;
@@ -19,6 +20,7 @@ mod base_tests;
 use crate::cpu::flags::Flags;
 use crate::cpu::registers::Registers;
 use crate::mmu::Mmu;
+use bus::CpuBus;
 
 pub enum OpcodeResult {
     Executed(usize),
@@ -65,19 +67,23 @@ impl Cpu {
         }
     }
 
-    /// Executes one CPU step against a borrowed bus. Machine collects device
-    /// requests before this call and advances devices after it returns.
+    /// Executes one CPU step. Instructions advance devices through their bus and
+    /// internal M-cycles; interrupt entry and idle states retain their existing
+    /// instruction-sized timing until their phase ordering is modeled separately.
     pub fn tick(&mut self, mmu: &mut Mmu) -> CpuStepResult {
         if self.handle_irq(mmu) {
             // Interrupt entry is a five-M-cycle hardware sequence: acknowledge IF, push the
             // current PC, and load the vector. Devices continue running for all 20 T-cycles.
+            mmu.do_ticks(20);
             CpuStepResult {
                 cycles: 20,
                 opcode: None,
                 diagnostic: None,
             }
         } else if self.state == CpuState::Running {
-            let result = self.do_cycle(mmu);
+            let mut bus = CpuBus::new(mmu);
+            let result = self.do_cycle(&mut bus);
+            bus.finish(result.cycles);
             // EI itself consumes the first completion; the following instruction consumes
             // the second. Interrupt entry and idle steps are not instruction completions.
             if self.ei_requested != 0 {
@@ -88,6 +94,7 @@ impl Cpu {
             }
             result
         } else {
+            mmu.do_ticks(4);
             CpuStepResult {
                 cycles: 4,
                 opcode: None,
@@ -142,17 +149,18 @@ impl Cpu {
             self.registers.pc = self.registers.pc.wrapping_sub(1);
             self.halt_bug = false;
         }
-        self.push(self.registers.pc, mmu);
+        self.registers.sp = self.registers.sp.wrapping_sub(2);
+        mmu.write_word(self.registers.sp, self.registers.pc);
         self.registers.pc = (0x0040 + 8 * irq_num) as u16;
         mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));
         true
     }
 
-    fn do_cycle(&mut self, mmu: &mut Mmu) -> CpuStepResult {
+    fn do_cycle(&mut self, bus: &mut CpuBus<'_>) -> CpuStepResult {
         let current_address = self.registers.pc;
-        let opcode = self.fetch_byte(mmu);
+        let opcode = self.fetch_byte(bus);
 
-        let (cycles, diagnostic) = match opcodes::execute(opcode, self, mmu) {
+        let (cycles, diagnostic) = match opcodes::execute(opcode, self, bus) {
             OpcodeResult::Executed(ticks) => (ticks, None),
             OpcodeResult::UnknownOpcode => {
                 self.state = CpuState::IllegalOpcode;
@@ -172,8 +180,8 @@ impl Cpu {
         }
     }
 
-    fn fetch_byte(&mut self, mmu: &Mmu) -> u8 {
-        let res = mmu.read_byte(self.registers.pc);
+    fn fetch_byte(&mut self, bus: &mut CpuBus<'_>) -> u8 {
+        let res = bus.read_byte(self.registers.pc);
         if self.halt_bug {
             // HALT with IME clear and an enabled pending interrupt reuses the opcode byte as
             // the next instruction's first byte. The suppression applies to one fetch only.
@@ -184,45 +192,49 @@ impl Cpu {
         res
     }
 
-    fn fetch_word(&mut self, mmu: &Mmu) -> u16 {
-        let res = mmu.read_word(self.registers.pc);
-        self.registers.pc = self.registers.pc.wrapping_add(2);
-        res
+    fn fetch_word(&mut self, bus: &mut CpuBus<'_>) -> u16 {
+        u16::from(self.fetch_byte(bus)) | (u16::from(self.fetch_byte(bus)) << 8)
     }
 
-    fn push(&mut self, value: u16, mmu: &mut Mmu) {
+    fn push(&mut self, value: u16, bus: &mut CpuBus<'_>) {
         self.registers.sp = self.registers.sp.wrapping_sub(2); //stack grows down from 0xFFFE and stores words
-        mmu.write_word(self.registers.sp, value);
+        bus.write_word(self.registers.sp, value);
     }
 
-    fn pop(&mut self, mmu: &Mmu) -> u16 {
-        let result = mmu.read_word(self.registers.sp);
-        self.registers.sp = self.registers.sp.wrapping_add(2);
-        result
+    fn pop(&mut self, bus: &mut CpuBus<'_>) -> u16 {
+        let low = bus.read_byte(self.registers.sp);
+        self.registers.sp = self.registers.sp.wrapping_add(1);
+        let high = bus.read_byte(self.registers.sp);
+        self.registers.sp = self.registers.sp.wrapping_add(1);
+        u16::from(low) | (u16::from(high) << 8)
     }
 
-    fn call(&mut self, address: u16, mmu: &mut Mmu) {
-        self.push(self.registers.pc, mmu); // PC already follows the immediate operand.
+    fn call(&mut self, address: u16, bus: &mut CpuBus<'_>) {
+        self.push(self.registers.pc, bus); // PC already follows the immediate operand.
         self.registers.pc = address;
     }
 
-    fn return_from_call(&mut self, mmu: &Mmu) {
-        self.registers.pc = self.pop(mmu);
+    fn return_from_call(&mut self, bus: &mut CpuBus<'_>) {
+        self.registers.pc = self.pop(bus);
     }
 
-    fn jump_r(&mut self, mmu: &Mmu) {
-        let offset = self.fetch_byte(mmu);
+    fn jump_r(&mut self, bus: &mut CpuBus<'_>) {
+        let offset = self.fetch_byte(bus);
         self.registers.pc = self.registers.pc.wrapping_add(offset as i8 as i16 as u16);
     }
 
     fn pending_interrupts(&self, mmu: &Mmu) -> u8 {
         mmu.read_byte(0xFFFF) & mmu.read_byte(0xFF0F) & 0x1F
     }
+
+    fn pending_interrupts_on_bus(&self, bus: &CpuBus<'_>) -> u8 {
+        bus.peek_byte(0xFFFF) & bus.peek_byte(0xFF0F) & 0x1F
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{opcodes, Cpu, CpuDiagnostic, CpuState};
+    use super::{opcodes, Cpu, CpuBus, CpuDiagnostic, CpuState};
     use crate::cpu::flags::CpuFlag;
     use crate::mbc::Mbc;
     use crate::mmu::Mmu;
@@ -260,19 +272,33 @@ mod tests {
     }
 
     #[test]
-    fn cpu_execution_borrows_the_bus_without_advancing_devices() {
+    fn cpu_execution_advances_devices_one_mcycle_per_nop() {
         let mut machine = machine_with_program(&[0, 0, 0, 0]);
         machine.mmu.write_byte(0xFF07, 0x05);
-        for _ in 0..4 {
-            // Deliberately bypass Machine::step: the CPU executes and accounts
-            // for time, but does not itself schedule or advance devices.
+        for _ in 0..3 {
             let result = machine.cpu.tick(&mut machine.mmu);
             assert_eq!((result.cycles, result.opcode), (4, Some(0)));
+            assert_eq!(machine.mmu.read_byte(0xFF05), 0);
         }
+        let result = machine.cpu.tick(&mut machine.mmu);
+        assert_eq!((result.cycles, result.opcode), (4, Some(0)));
         assert_eq!(machine.cpu.registers.pc, 0x104);
-        assert_eq!(machine.mmu.read_byte(0xFF05), 0);
-        machine.mmu.do_ticks(16);
         assert_eq!(machine.mmu.read_byte(0xFF05), 1);
+    }
+
+    #[test]
+    fn pop_reads_stack_bytes_on_separate_mcycles() {
+        let mut machine = machine_with_program(&[0xC1]); // POP BC
+        machine.cpu.registers.sp = 0xFF03; // Unused IO byte, then DIV.
+        machine.mmu.do_ticks(248);
+        assert_eq!(machine.mmu.read_byte(0xFF04), 0);
+
+        assert_step(&mut machine, 12, Some(0xC1));
+
+        // Opcode fetch reaches cycle 252. The low-byte read then advances DIV
+        // through 256, so the following high-byte read observes one.
+        assert_eq!(machine.cpu.registers.get_bc(), 0x01FF);
+        assert_eq!(machine.cpu.registers.sp, 0xFF05);
     }
 
     fn assert_step(machine: &mut Machine, cycles: usize, opcode: Option<u8>) {
@@ -403,11 +429,12 @@ mod tests {
         let mut machine = machine_with_rom(Vec::new());
         machine.cpu.registers.pc = 0xFFFF;
 
-        machine.cpu.fetch_byte(&machine.mmu);
+        let mut bus = CpuBus::new(&mut machine.mmu);
+        machine.cpu.fetch_byte(&mut bus);
         assert_eq!(machine.cpu.registers.pc, 0);
 
         machine.cpu.registers.pc = 0xFFFE;
-        machine.cpu.fetch_word(&machine.mmu);
+        machine.cpu.fetch_word(&mut bus);
         assert_eq!(machine.cpu.registers.pc, 0);
     }
 
@@ -455,7 +482,8 @@ mod tests {
         machine.cpu.registers.flags.set_flag(CpuFlag::Z, true);
 
         // PC already points to JR NZ's one-byte operand after its opcode was fetched.
-        opcodes::execute(0x20, &mut machine.cpu, &mut machine.mmu);
+        let mut bus = CpuBus::new(&mut machine.mmu);
+        opcodes::execute(0x20, &mut machine.cpu, &mut bus);
 
         assert_eq!(machine.cpu.registers.pc, 0);
     }

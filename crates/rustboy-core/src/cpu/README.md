@@ -68,14 +68,16 @@ emulated boot ROM or a guarantee of exact DMG post-boot state. IME starts clear.
 1. Collect device interrupt requests into IF through the MMU.
 2. Lend the MMU to `Cpu::tick(&mut mmu)`. The CPU checks for interrupts, then either
    performs interrupt entry, executes one instruction when running, or idles.
-3. The CPU completes pending EI-delay bookkeeping after an executed instruction
-   and returns cycles, opcode and optional diagnostic. It does not advance devices.
-4. `Machine` advances the MMU's timer, PPU and APU by the returned T-cycle total.
+3. CPU bus and internal M-cycles advance devices during normal execution; interrupt
+   entry and idle paths explicitly advance their full duration.
+4. The CPU completes pending EI-delay bookkeeping after an executed instruction
+   and returns cycles, opcode and optional diagnostic.
 5. `Machine` collects completed frames and audio buffers into the public step result.
 
 Opcode handlers, fetch/stack helpers and `Operand8` receive an explicit bus borrow
-where needed. Reads use `&Mmu`; writes use `&mut Mmu`. Pure register/ALU helpers
-need no bus. The CPU no longer forwards input, memory inspection or device output.
+where needed. Execution accesses use `CpuBus`; inspection reads remain untimed on
+`Mmu`. Pure register/ALU helpers need no bus. The CPU does not forward input,
+memory inspection or device output.
 
 The opcode handlers return `OpcodeResult::Executed(t_cycles)` or
 `OpcodeResult::UnknownOpcode`. The public machine returns the executed **base**
@@ -255,9 +257,15 @@ The `(HL)` CB operations need memory access beyond the prefix/opcode fetches.
 BIT reads but does not write; rotates/shifts/RES/SET read and write the operand.
 This explains the 12-versus-16-cycle distinction.
 
-Devices advance **after** the instruction's state changes and memory accesses.
-The CPU is T-cycle-accounted, not M-cycle-executed: correct instruction totals
-do not establish correct ordering of bus reads/writes within an instruction.
+Normal instructions use an M-cycle execution bus. A CPU access is sampled at the
+start of its four-T-cycle operation, then devices advance through that M-cycle.
+Multi-byte reads and writes therefore occupy separate operations. Opcode handlers
+fill any remaining duration with internal M-cycles.
+
+This seam does not make execution cycle-perfect. Several instructions still place
+their unspecialized internal cycles at the end, stack writes retain their existing
+order, and interrupt entry remains a single 20-T-cycle batch. Register-update phases
+are not independently scheduled.
 
 ## Interrupts
 
@@ -319,9 +327,9 @@ cargo test -p rustboy-core cpu::base_tests
 
 CPU integration fixtures contain a real `Machine` with a synthetic cartridge;
 instruction tests use `Machine::step`, exercising the production coordination path.
-Separate boundary tests verify request collection before operand reads, device
-advancement after CPU bus accesses, input routing without stepping, and CPU-only
-execution against a borrowed bus without automatic device advancement.
+Separate boundary tests verify request collection before dispatch, device advancement
+through CPU M-cycles, bus samples observing preceding M-cycles, split POP reads,
+and input routing without stepping.
 
 The timing tests execute all **244 legal unprefixed instructions** and all **256
 CB-prefixed instructions** across all sixteen flag combinations. That includes
@@ -344,8 +352,8 @@ CB semantic tests execute every opcode with all 256 operand values and all sixte
 flag combinations. They check destination and unaffected registers, WRAM, flags,
 PC/SP, reported opcode, HALT state and cycle totals. Separate tests address DIV
 through `(HL)` to detect unwanted BIT writes and missing read/modify/write stores,
-including stores whose value is unchanged. These verify instruction-level effects,
-not M-cycle bus ordering.
+including stores whose value is unchanged. The semantic matrix verifies final
+instruction effects; focused integration tests verify selected M-cycle ordering.
 
 Base semantic tests cover the register-load matrix, all byte inputs/flags for
 INC/DEC/immediate-load routing, ALU register/memory/immediate selection, word

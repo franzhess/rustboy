@@ -20,14 +20,16 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - The master clock is 4,194,304 Hz. The core uses T-cycles throughout; four T-cycles are one
   CPU M-cycle.
 - `Machine::step` executes one instruction, services an interrupt (20 T-cycles), or idles in
-  HALT (4 T-cycles), advancing devices by that step's total T-cycles. Its opcode is `None`
-  for interrupt entry and HALT idle. Devices share this cycle count, never host time.
-- The core is T-cycle-accounted but not M-cycle-executed. It does not yet schedule CPU bus reads,
-  writes, and register updates within their exact M-cycle phases.
-- Model hardware edges inside instruction-sized batches when required. The timer, for example,
-  advances its divider one T-cycle at a time to preserve selected-bit falling edges.
-- Do not claim or implement cycle-perfect behavior without adding the required CPU scheduling.
-  TIMA reload-cycle write priority and some HALT edge cases need M-cycle-level ordering.
+  HALT (4 T-cycles). Its opcode is `None` for interrupt entry and HALT idle. Devices use CPU
+  time, never host time.
+- Normal instructions use an M-cycle execution bus. CPU accesses are sampled at the start of
+  their four-T-cycle operation, then devices advance through that operation. Remaining duration
+  is filled with internal M-cycles. Multi-byte reads and writes are separate bus operations.
+- The model is not cycle-perfect: several instructions still place internal cycles at the end,
+  stack-write order is not yet corrected, register updates are not independently phased, and
+  interrupt entry still advances as one 20-T-cycle batch.
+- The timer advances its divider one T-cycle at a time inside each M-cycle to preserve selected-bit
+  falling edges. TIMA reload-cycle write priority and some HALT edges still need finer ordering.
 
 ## Timer Notes
 
@@ -61,8 +63,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   Otherwise HALT waits for an enabled request; with IME clear it resumes without servicing it.
 - EI followed by HALT with a request already pending saves the HALT address on interrupt entry
   and clears the fetch-suppression flag before the handler runs.
-- Mooneye `ei_sequence`, `ei_timing`, `rapid_di_ei`, and `halt_ime1_timing` pass. The other three
-  `acceptance/halt_*` tests, `di_timing-GS`, and `reti_timing` still time out in the ROM runner.
+- Mooneye `ei_sequence`, `ei_timing`, `rapid_di_ei`, `di_timing-GS`, and all four direct
+  `acceptance/halt_*` tests pass. `reti_timing` still fails; its stack reads need explicit phases.
 - The EI/HALT integration makes `gbmicrotest/halt_op_dupe` and `int_hblank_halt_bug_b` pass,
   but changes `gbmicrotest/halt_bug` from passing to failing. That test sums timer reads:
   it now reports `0x16` instead of `0x14`. The old path incorrectly executed the post-HALT

@@ -64,6 +64,7 @@ impl Mmu {
         }
     }
 
+    #[cfg(test)]
     pub fn read_word(&self, address: u16) -> u16 {
         //LSB FIRST
         self.read_byte(address) as u16 | (self.read_byte(address.wrapping_add(1)) as u16) << 8
