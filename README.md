@@ -77,6 +77,9 @@ The most valuable automated tests sit at the behavior boundaries:
 - adapters: ROM file/ZIP limits and SDL input mapping, without duplicating core conformance tests.
 - `rustboy-rom-tests`: black-box acceptance coverage from upstream ROM suites.
 
+The reproducible core output allocation baseline and follow-up are documented in
+[`docs/buffer-allocation-profile.md`](docs/buffer-allocation-profile.md).
+
 ## Emulator test suites
 
 Test ROM suites are intentionally not committed. They are large, combine projects under separate upstream licenses, and should remain independently updateable. Clone the MIT-licensed [GameboyTestSuites](https://github.com/adtennant/GameboyTestSuites) aggregate into the ignored `roms/` directory when validating emulator behavior:
