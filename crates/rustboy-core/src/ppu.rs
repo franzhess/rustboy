@@ -4,6 +4,11 @@ use crate::SCREEN_WIDTH;
 
 pub const VRAM_SIZE: usize = 0x2000; //8kB vram
 pub const OAM_SIZE: usize = 0xA0; // 40 sprites * 4 attribute bytes.
+const DOTS_PER_LINE: usize = 456;
+const OAM_SEARCH_END: usize = 80;
+const PIXEL_TRANSFER_END: usize = 252;
+const VISIBLE_LINES: u8 = 144;
+const TOTAL_LINES: u8 = 154;
 
 /// LCD modes, with discriminants matching STAT bits 0–1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,6 +213,10 @@ impl Ppu {
         std::mem::take(&mut self.irq_stat)
     }
 
+    pub(crate) fn cpu_can_access_oam(&self) -> bool {
+        !self.lcd_enabled || matches!(self.mode, PpuMode::HBlank | PpuMode::VBlank)
+    }
+
     /* timing
     OAM search - 80 - determine which sprites are visible
     pixel transfer - 172 - draw the stuff
@@ -215,48 +224,67 @@ impl Ppu {
     Single line 456
     Vertical blank 4560
     Entire frame 70224 */
-    pub fn do_ticks(&mut self, ticks: usize) {
-        if self.lcd_enabled {
-            self.clock += ticks;
-
-            while self.clock >= 456 {
-                //advance one line
-                self.clock -= 456;
-                self.line = (self.line + 1) % 154; // 144 visible lines + 10 VBlank lines.
-
-                if self.irq_lyc_enable {
-                    self.irq_stat = self.line == self.line_compare;
-                }
-
-                if self.line >= 144 && self.mode != PpuMode::VBlank {
-                    self.set_mode(PpuMode::VBlank);
-                }
-            }
-
-            if self.line < 144 {
-                if self.clock <= 80 {
-                    if self.mode != PpuMode::OamSearch {
-                        self.set_mode(PpuMode::OamSearch);
-                    }
-                } else if self.clock <= 80 + 172 {
-                    if self.mode != PpuMode::PixelTransfer {
-                        self.set_mode(PpuMode::PixelTransfer);
-                    }
-                } else {
-                    if self.mode != PpuMode::HBlank {
-                        self.set_mode(PpuMode::HBlank);
-                    }
-                }
-            }
-        } else {
+    pub fn do_ticks(&mut self, mut ticks: usize) {
+        if !self.lcd_enabled {
             // Reset directly: LCD disable does not run HBlank entry effects.
             self.line = 0;
             self.mode = PpuMode::HBlank;
+            return;
+        }
+
+        if self.line < VISIBLE_LINES && self.clock < OAM_SEARCH_END {
+            self.set_mode_if_changed(PpuMode::OamSearch);
+        }
+
+        while ticks > 0 {
+            let boundary = if self.line >= VISIBLE_LINES {
+                DOTS_PER_LINE
+            } else if self.clock < OAM_SEARCH_END {
+                OAM_SEARCH_END
+            } else if self.clock < PIXEL_TRANSFER_END {
+                PIXEL_TRANSFER_END
+            } else {
+                DOTS_PER_LINE
+            };
+            let elapsed = ticks.min(boundary - self.clock);
+            self.clock += elapsed;
+            ticks -= elapsed;
+
+            if self.clock != boundary {
+                continue;
+            }
+
+            match boundary {
+                OAM_SEARCH_END => self.set_mode_if_changed(PpuMode::PixelTransfer),
+                PIXEL_TRANSFER_END => self.set_mode_if_changed(PpuMode::HBlank),
+                DOTS_PER_LINE => self.advance_line(),
+                _ => unreachable!(),
+            }
         }
     }
 
-    /// Applies mode-entry rendering and interrupt effects. VRAM/OAM access
-    /// restrictions are not yet enforced by this simplified scanline model.
+    fn advance_line(&mut self) {
+        self.clock = 0;
+        self.line = (self.line + 1) % TOTAL_LINES;
+
+        if self.irq_lyc_enable {
+            self.irq_stat = self.line == self.line_compare;
+        }
+
+        if self.line == VISIBLE_LINES {
+            self.set_mode_if_changed(PpuMode::VBlank);
+        } else if self.line < VISIBLE_LINES {
+            self.set_mode_if_changed(PpuMode::OamSearch);
+        }
+    }
+
+    fn set_mode_if_changed(&mut self, mode: PpuMode) {
+        if self.mode != mode {
+            self.set_mode(mode);
+        }
+    }
+
+    /// Applies mode-entry rendering and interrupt effects.
     fn set_mode(&mut self, mode: PpuMode) {
         self.mode = mode;
 
@@ -417,18 +445,18 @@ mod test {
     use super::*;
 
     #[test]
-    fn stat_reports_modes_at_the_existing_scanline_thresholds() {
+    fn stat_reports_modes_at_exact_scanline_boundaries() {
         let mut ppu = Ppu::new();
         assert_eq!(ppu.read_byte(0xFF41) & 3, 0);
 
-        // Characterize the current inclusive thresholds, not exact hardware edges.
         for (ticks, expected_mode, expected_line) in [
             (1, 2, 0),
-            (79, 2, 0),
-            (1, 3, 0),
+            (78, 2, 0),
+            (1, 3, 0), // Dot 80.
             (171, 3, 0),
-            (1, 0, 0),
-            (203, 2, 1),
+            (1, 0, 0), // Dot 252.
+            (203, 0, 0),
+            (1, 2, 1), // Dot 456, next line.
         ] {
             ppu.do_ticks(ticks);
             assert_eq!(ppu.read_byte(0xFF41) & 3, expected_mode);
@@ -450,15 +478,41 @@ mod test {
             assert_eq!(ppu.take_stat_interrupt(), enables == 0x20);
             ppu.do_ticks(4); // Same mode: no repeated request.
             assert!(!ppu.take_stat_interrupt());
-            ppu.do_ticks(76); // Pixel transfer at clock 84.
+            ppu.do_ticks(72); // Pixel transfer at dot 80.
             assert!(!ppu.take_stat_interrupt());
-            ppu.do_ticks(172); // HBlank at clock 256.
+            ppu.do_ticks(172); // HBlank at dot 252.
             assert_eq!(ppu.take_stat_interrupt(), enables == 0x08);
             ppu.do_ticks(4);
             assert!(!ppu.take_stat_interrupt());
             assert!(!ppu.take_vblank_interrupt());
             assert!(ppu.take_frame().is_none());
         }
+    }
+
+    #[test]
+    fn cpu_oam_access_follows_mode_boundaries() {
+        let mut ppu = Ppu::new();
+        assert!(ppu.cpu_can_access_oam());
+
+        ppu.do_ticks(1);
+        assert!(!ppu.cpu_can_access_oam());
+        ppu.do_ticks(79);
+        assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+        assert!(!ppu.cpu_can_access_oam());
+        ppu.do_ticks(172);
+        assert_eq!(ppu.mode, PpuMode::HBlank);
+        assert!(ppu.cpu_can_access_oam());
+    }
+
+    #[test]
+    fn one_tick_batch_processes_every_crossed_mode_boundary() {
+        let mut ppu = Ppu::new();
+
+        ppu.do_ticks(DOTS_PER_LINE + OAM_SEARCH_END);
+
+        assert_eq!(ppu.line, 1);
+        assert_eq!(ppu.clock, OAM_SEARCH_END);
+        assert_eq!(ppu.mode, PpuMode::PixelTransfer);
     }
 
     #[test]

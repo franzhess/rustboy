@@ -90,6 +90,15 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   All legal base and CB opcode durations are covered by unit tests across all flag combinations;
   this verifies instruction totals, not the ordering of bus operations within an instruction.
 
+## PPU Notes
+
+- Visible lines use fixed boundaries: mode 2 at dot 0, mode 3 at dot 80, HBlank at dot 252,
+  and the next line at dot 456. Batched ticks process every crossed boundary in order.
+- CPU OAM reads return `FF` and writes are ignored in modes 2 and 3. DMA and untimed internal
+  accesses bypass this gate.
+- Mooneye `acceptance/ppu` passes 5 of 12 tests. Remaining work covers combined STAT-line
+  edges, LCD startup/write timing, and variable mode-3 duration from SCX and sprite fetches.
+
 ## Testing
 
 The post-integration ROM baseline and follow-up notes are in `docs/rom-conformance.md`.

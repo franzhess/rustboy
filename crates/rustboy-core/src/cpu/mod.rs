@@ -324,6 +324,7 @@ mod tests {
         let mut machine = machine_with_program(&[0xC5, 0x00]); // PUSH BC; NOP
         machine.cpu.registers.set_bc(0x12C0);
         machine.cpu.registers.sp = 0xFF48;
+        machine.mmu.write_byte(0xFF40, 0);
         machine.mmu.write_byte(0xC000, 0x42);
         machine.mmu.write_byte(0xFE00, 0x11);
 

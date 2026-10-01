@@ -88,7 +88,9 @@ impl Mmu {
     }
 
     pub(crate) fn read_cpu_byte(&self, address: u16) -> u8 {
-        if self.oam_dma_active() && (0xFE00..=0xFE9F).contains(&address) {
+        if (0xFE00..=0xFE9F).contains(&address)
+            && (self.oam_dma_active() || !self.ppu.cpu_can_access_oam())
+        {
             0xFF
         } else {
             self.read_byte(address)
@@ -128,7 +130,9 @@ impl Mmu {
     }
 
     pub(crate) fn write_cpu_byte(&mut self, address: u16, value: u8) {
-        if !self.oam_dma_active() || !(0xFE00..=0xFE9F).contains(&address) {
+        if !(0xFE00..=0xFE9F).contains(&address)
+            || (!self.oam_dma_active() && self.ppu.cpu_can_access_oam())
+        {
             self.write_byte(address, value);
         }
     }
@@ -295,6 +299,24 @@ mod tests {
         let mut mmu = Mmu::new(Box::new(TestMbc));
         mmu.write_byte(0xFF40, 0);
         mmu
+    }
+
+    #[test]
+    fn ppu_modes_block_cpu_oam_reads_and_writes() {
+        let mut mmu = Mmu::new(Box::new(TestMbc));
+        mmu.write_byte(0xFE00, 0x11);
+
+        mmu.do_ticks(4); // OAM search.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.write_cpu_byte(0xFE00, 0x22);
+        assert_eq!(mmu.read_byte(0xFE00), 0x11);
+
+        mmu.do_ticks(76); // Pixel transfer starts at dot 80.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.do_ticks(172); // HBlank starts at dot 252.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0x11);
+        mmu.write_cpu_byte(0xFE00, 0x22);
+        assert_eq!(mmu.read_byte(0xFE00), 0x22);
     }
 
     #[test]

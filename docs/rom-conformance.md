@@ -1,5 +1,18 @@
 # ROM conformance baseline
 
+## Base PPU dot and mode timeline — 2026-10-01
+
+Visible scanlines now enter mode 2 at dot 0, mode 3 at dot 80, and HBlank at dot
+252. PPU tick batches process every crossed boundary rather than deriving only the
+final mode, and line/VBlank transitions occur at 456-dot boundaries. CPU OAM reads
+return `FF` and writes are ignored during modes 2 and 3; DMA and untimed internal
+access continue to bypass this CPU gate.
+
+`acceptance/ppu/intr_2_0_timing`, `intr_2_mode0_timing`, `intr_2_mode3_timing`, and
+`intr_2_oam_ok_timing` now pass without regressions. The PPU subfolder is **5/12**,
+and the full eligible Mooneye acceptance result is **53/62**. Remaining PPU work is
+separated into STAT-line aggregation, LCD startup, and variable mode-3 timing.
+
 ## OAM DMA source aliases — 2026-09-30
 
 DMG OAM DMA source addresses in `E000–FFFF` now alias `C000–DFFF`. The translation
