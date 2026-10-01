@@ -1,5 +1,17 @@
 # ROM conformance baseline
 
+## Combined PPU STAT interrupt line — 2026-10-01
+
+The four enabled STAT sources now feed one level signal, and the PPU requests a STAT
+interrupt only on its low-to-high edge. Mode, LY/LYC, STAT-enable, and LCD-state
+changes recompute the signal. The LY=LYC result is latched while the LCD is disabled,
+and the DMG mode-2 source also rises when line 144 enters VBlank.
+
+`acceptance/ppu/stat_irq_blocking` and `vblank_stat_intr-GS` now pass without
+regressions. The PPU subfolder is **7/12**, and the full eligible Mooneye acceptance
+result is **55/62**. `stat_lyc_onoff` exercises the new latch behavior but remains
+blocked by the line-0 mode-0 LCD startup sequence scoped to the next PPU batch.
+
 ## Base PPU dot and mode timeline — 2026-10-01
 
 Visible scanlines now enter mode 2 at dot 0, mode 3 at dot 80, and HBlank at dot

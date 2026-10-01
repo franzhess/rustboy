@@ -23,6 +23,7 @@ enum PpuMode {
 pub struct Ppu {
     irq_vblank: bool,
     irq_stat: bool,
+    stat_line: bool,
 
     screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
     color_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
@@ -44,6 +45,7 @@ pub struct Ppu {
     irq_m1_enable: bool,
     irq_m2_enable: bool,
     irq_lyc_enable: bool,
+    lyc_equal: bool,
     scroll_y: u8,      //SCY FF42
     scroll_x: u8,      //SCX FF43
     line: u8,          //LY FF44 current line drawn by the display controller
@@ -66,6 +68,7 @@ impl Ppu {
             frame: None,
             irq_vblank: false,
             irq_stat: false,
+            stat_line: false,
             clock: 0, // for the first line
             vram: [0; VRAM_SIZE],
             oam: [0; OAM_SIZE],
@@ -82,6 +85,7 @@ impl Ppu {
             irq_m1_enable: false,
             irq_m2_enable: false,
             irq_lyc_enable: false,
+            lyc_equal: true,
             scroll_y: 0x00,
             scroll_x: 0x00,
             line: 0x00,
@@ -129,11 +133,7 @@ impl Ppu {
                     | (if self.irq_m2_enable { 0x20 } else { 0x00 })
                     | (if self.irq_m1_enable { 0x10 } else { 0x00 })
                     | (if self.irq_m0_enable { 0x08 } else { 0x00 })
-                    | (if self.line == self.line_compare {
-                        0x04
-                    } else {
-                        0x00
-                    })
+                    | (if self.lyc_equal { 0x04 } else { 0x00 })
                     | self.mode as u8
             }
             0xFF42 => self.scroll_y,
@@ -160,6 +160,7 @@ impl Ppu {
                 self.oam[offset] = value;
             }
             0xFF40 => {
+                let was_enabled = self.lcd_enabled;
                 self.lcd_enabled = value & 0x80 == 0x80;
                 self.window_tilemap_select = value & 0x40 == 0x40;
                 self.window_enable = value & 0x20 == 0x20;
@@ -168,17 +169,34 @@ impl Ppu {
                 self.sprite_size = if value & 0x04 == 0x04 { 16 } else { 8 };
                 self.sprite_enable = value & 0x02 == 0x02;
                 self.bg_window_priority = value & 0x01 == 0x01;
+                if self.lcd_enabled && !was_enabled {
+                    self.lyc_equal = self.line == self.line_compare;
+                }
+                self.update_stat_line();
             }
             0xFF41 => {
                 self.irq_lyc_enable = value & 0x40 == 0x40;
                 self.irq_m2_enable = value & 0x20 == 0x20;
                 self.irq_m1_enable = value & 0x10 == 0x10;
                 self.irq_m0_enable = value & 0x08 == 0x08;
+                self.update_stat_line();
             }
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
-            0xFF45 => self.line_compare = value,
-            0xFF44 => self.line = 0,
+            0xFF45 => {
+                self.line_compare = value;
+                if self.lcd_enabled {
+                    self.lyc_equal = self.line == self.line_compare;
+                }
+                self.update_stat_line();
+            }
+            0xFF44 => {
+                self.line = 0;
+                if self.lcd_enabled {
+                    self.lyc_equal = self.line == self.line_compare;
+                }
+                self.update_stat_line();
+            }
             0xFF47 => self.bg_palette = value,
             0xFF48 => self.obj_palette_1 = value,
             0xFF49 => self.obj_palette_2 = value,
@@ -229,6 +247,7 @@ impl Ppu {
             // Reset directly: LCD disable does not run HBlank entry effects.
             self.line = 0;
             self.mode = PpuMode::HBlank;
+            self.update_stat_line();
             return;
         }
 
@@ -266,10 +285,8 @@ impl Ppu {
     fn advance_line(&mut self) {
         self.clock = 0;
         self.line = (self.line + 1) % TOTAL_LINES;
-
-        if self.irq_lyc_enable {
-            self.irq_stat = self.line == self.line_compare;
-        }
+        self.lyc_equal = self.line == self.line_compare;
+        self.update_stat_line();
 
         if self.line == VISIBLE_LINES {
             self.set_mode_if_changed(PpuMode::VBlank);
@@ -284,29 +301,36 @@ impl Ppu {
         }
     }
 
+    fn update_stat_line(&mut self) {
+        let mode_source = self.lcd_enabled
+            && match self.mode {
+                PpuMode::HBlank => self.irq_m0_enable,
+                PpuMode::VBlank => {
+                    self.irq_m1_enable || (self.irq_m2_enable && self.line == VISIBLE_LINES)
+                }
+                PpuMode::OamSearch => self.irq_m2_enable,
+                PpuMode::PixelTransfer => false,
+            };
+        let next_line = mode_source || (self.irq_lyc_enable && self.lyc_equal);
+        if next_line && !self.stat_line {
+            self.irq_stat = true;
+        }
+        self.stat_line = next_line;
+    }
+
     /// Applies mode-entry rendering and interrupt effects.
     fn set_mode(&mut self, mode: PpuMode) {
         self.mode = mode;
+        self.update_stat_line();
 
         match mode {
             PpuMode::VBlank => {
-                if self.irq_m1_enable {
-                    self.irq_stat = true;
-                };
                 self.irq_vblank = true;
                 self.frame = Some(self.get_screen_buffer());
             }
-            PpuMode::OamSearch => {
-                if self.irq_m2_enable {
-                    self.irq_stat = true;
-                }
-            }
+            PpuMode::OamSearch => {}
             PpuMode::PixelTransfer => self.render_line(),
-            PpuMode::HBlank => {
-                if self.irq_m0_enable {
-                    self.irq_stat = true;
-                }
-            }
+            PpuMode::HBlank => {}
         }
     }
 
@@ -473,20 +497,72 @@ mod test {
     fn visible_mode_entries_request_only_the_enabled_stat_interrupt() {
         for enables in [0, 0x08, 0x10, 0x20] {
             let mut ppu = Ppu::new();
+            ppu.do_ticks(OAM_SEARCH_END); // Start from mode 3, which has no STAT source.
             ppu.write_byte(0xFF41, enables);
-            ppu.do_ticks(4); // OAM search
+            assert!(!ppu.take_stat_interrupt());
+            ppu.do_ticks(PIXEL_TRANSFER_END - OAM_SEARCH_END);
+            assert_eq!(ppu.take_stat_interrupt(), enables == 0x08);
+            ppu.do_ticks(DOTS_PER_LINE - PIXEL_TRANSFER_END);
             assert_eq!(ppu.take_stat_interrupt(), enables == 0x20);
             ppu.do_ticks(4); // Same mode: no repeated request.
-            assert!(!ppu.take_stat_interrupt());
-            ppu.do_ticks(72); // Pixel transfer at dot 80.
-            assert!(!ppu.take_stat_interrupt());
-            ppu.do_ticks(172); // HBlank at dot 252.
-            assert_eq!(ppu.take_stat_interrupt(), enables == 0x08);
-            ppu.do_ticks(4);
             assert!(!ppu.take_stat_interrupt());
             assert!(!ppu.take_vblank_interrupt());
             assert!(ppu.take_frame().is_none());
         }
+    }
+
+    #[test]
+    fn combined_stat_line_blocks_edges_while_any_source_stays_high() {
+        let mut ppu = Ppu::new();
+        ppu.do_ticks(1); // Mode 2 with LY=LYC.
+        ppu.write_byte(0xFF41, 0x78);
+        assert!(ppu.take_stat_interrupt());
+
+        ppu.do_ticks(DOTS_PER_LINE - 1); // LYC, mode 0, and mode 2 bridge the line.
+        assert_eq!((ppu.line, ppu.mode), (1, PpuMode::OamSearch));
+        assert!(!ppu.take_stat_interrupt());
+
+        ppu.write_byte(0xFF45, 1);
+        ppu.do_ticks(OAM_SEARCH_END); // Coincidence bridges mode 2 through mode 3.
+        assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+        assert!(!ppu.take_stat_interrupt());
+
+        ppu.write_byte(0xFF41, 0);
+        ppu.write_byte(0xFF41, 0x40);
+        assert!(ppu.take_stat_interrupt());
+    }
+
+    #[test]
+    fn lcd_off_retains_the_coincidence_latch_until_restart() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF41, 0x40);
+        assert!(ppu.take_stat_interrupt());
+        ppu.write_byte(0xFF45, 1);
+        ppu.do_ticks(DOTS_PER_LINE);
+        assert!(ppu.take_stat_interrupt());
+        assert_ne!(ppu.read_byte(0xFF41) & 0x04, 0);
+
+        ppu.write_byte(0xFF40, 0);
+        ppu.do_ticks(4);
+        ppu.write_byte(0xFF45, 2);
+        assert_ne!(ppu.read_byte(0xFF41) & 0x04, 0);
+
+        ppu.write_byte(0xFF40, 0x80);
+        assert_eq!(ppu.read_byte(0xFF41) & 0x04, 0);
+        assert!(!ppu.take_stat_interrupt());
+    }
+
+    #[test]
+    fn mode_two_stat_source_also_rises_at_vblank_entry() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF41, 0x20);
+        ppu.do_ticks(143 * DOTS_PER_LINE + PIXEL_TRANSFER_END);
+        assert!(ppu.take_stat_interrupt());
+
+        ppu.do_ticks(DOTS_PER_LINE - PIXEL_TRANSFER_END);
+        assert_eq!((ppu.line, ppu.mode), (VISIBLE_LINES, PpuMode::VBlank));
+        assert!(ppu.take_vblank_interrupt());
+        assert!(ppu.take_stat_interrupt());
     }
 
     #[test]

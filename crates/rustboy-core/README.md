@@ -224,10 +224,15 @@ The nominal frame schedule is 456 T-cycles per line, with 144 visible lines and
 | 1 | `VBlank` | VBlank, lines 144–153; entering it publishes a frame and requests VBlank |
 
 The mode is stored as a `PpuMode` enum, whose explicit discriminants encode STAT
-bits 0–1. STAT writes only change interrupt enables, not the current mode. Mode-entry
-effects use an exhaustive match: OAM search and HBlank request STAT when enabled;
-pixel transfer renders a line; VBlank publishes a frame, requests VBlank, and
-requests STAT if its mode-1 enable is set.
+bits 0–1. STAT writes only change interrupt enables, not the current mode. The mode
+0, mode 1, mode 2, and LY=LYC sources feed one level signal; STAT is requested only
+when that combined signal rises. A source that stays high therefore blocks another
+enabled source from generating a duplicate request. On DMG, the mode-2 source also
+rises at line 144 when VBlank starts. The LY=LYC result remains latched while the LCD
+is disabled and is recomputed when the LCD restarts.
+
+Mode-entry effects use an exhaustive match: pixel transfer renders a line, while
+VBlank publishes a frame and requests the separate VBlank interrupt.
 
 The current initial mode is HBlank even though LCDC starts enabled; the first device
 tick enters OAM search. Visible lines enter pixel transfer at dot 80, HBlank at dot
@@ -235,8 +240,8 @@ tick enters OAM search. Visible lines enter pixel transfer at dot 80, HBlank at 
 order. CPU OAM reads return `FF` and writes are ignored during OAM search and pixel
 transfer; raw PPU and DMA accesses bypass this CPU restriction. Disabling the LCD
 resets LY and the mode to HBlank on the next device tick without running HBlank-entry
-effects. Mode 3 still has a fixed 172-dot duration; SCX and sprite-fetch penalties,
-LCD startup timing, and combined STAT interrupt-line behavior are not yet modeled.
+effects. Mode 3 still has a fixed 172-dot duration; SCX and sprite-fetch penalties
+and LCD startup timing are not yet modeled.
 
 Run the PPU tests with `cargo test -p rustboy-core ppu::`.
 

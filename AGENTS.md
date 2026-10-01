@@ -96,8 +96,11 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   and the next line at dot 456. Batched ticks process every crossed boundary in order.
 - CPU OAM reads return `FF` and writes are ignored in modes 2 and 3. DMA and untimed internal
   accesses bypass this gate.
-- Mooneye `acceptance/ppu` passes 5 of 12 tests. Remaining work covers combined STAT-line
-  edges, LCD startup/write timing, and variable mode-3 duration from SCX and sprite fetches.
+- STAT sources use one combined level signal and request an interrupt only on its rising edge.
+  LY=LYC is latched while LCD is off, and the DMG mode-2 source also rises at VBlank entry.
+- Mooneye `acceptance/ppu` passes 7 of 12 tests. `stat_lyc_onoff` still needs the LCD
+  startup state; other remaining work covers startup/write timing and variable mode-3
+  duration from SCX and sprite fetches.
 
 ## Testing
 
