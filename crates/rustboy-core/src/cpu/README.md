@@ -264,9 +264,8 @@ Multi-byte reads and writes therefore occupy separate operations. Opcode handler
 fill any remaining duration with internal M-cycles.
 
 This seam does not make execution cycle-perfect. Several instructions still place
-their unspecialized internal cycles at the end, conditional RET is not fully phased,
-and interrupt entry remains a single 20-T-cycle batch. Register-update phases are not
-independently scheduled.
+their unspecialized internal cycles at the end, and interrupt entry remains a single
+20-T-cycle batch. Register-update phases are not independently scheduled.
 
 ## Interrupts
 

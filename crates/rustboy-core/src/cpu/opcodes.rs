@@ -225,6 +225,7 @@ fn execute_control(y: u8, z: u8, cpu: &mut Cpu, bus: &mut CpuBus<'_>) -> OpcodeR
         (0, 0..=3) => {
             // RET cc
             if condition_holds(y, &cpu.registers.flags) {
+                bus.internal_mcycle();
                 cpu.return_from_call(bus);
                 20
             } else {

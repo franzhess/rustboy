@@ -1,5 +1,16 @@
 # ROM conformance baseline
 
+## Conditional RET timing — 2026-09-30
+
+Taken conditional RET now performs its leading internal M-cycle before the low and
+high stack reads, then finishes with its trailing internal M-cycle. Untaken RET keeps
+its existing two-M-cycle duration, while RET, RETI, and RETI interrupt dispatch remain
+unchanged.
+
+`acceptance/ret_cc_timing` now passes without regressions. All **29/29** direct generic
+DMG acceptance tests pass, completing the direct-test milestone. The full eligible
+Mooneye acceptance result is **47/62**.
+
 ## PUSH, RST, and CALL stack writes — 2026-09-30
 
 Normal CPU pushes now use an internal M-cycle followed by separate high-byte and

@@ -322,6 +322,22 @@ mod tests {
         assert_eq!(machine.mmu.read_cpu_byte(0xFE00), 0xFF);
     }
 
+    #[test]
+    fn taken_conditional_return_delays_before_reading_the_stack() {
+        let mut machine = machine_with_program(&[0xC0]); // RET NZ
+        machine.cpu.registers.flags.set_flag(CpuFlag::Z, false);
+        machine.cpu.registers.sp = 0xFF04; // DIV low byte, then TIMA high byte.
+        machine.mmu.write_byte(0xFF05, 0xC0);
+        machine.mmu.do_ticks(248);
+
+        assert_step(&mut machine, 20, Some(0xC0));
+
+        // Fetch reaches cycle 252 and the leading internal cycle reaches 256,
+        // so the low-byte DIV read observes one.
+        assert_eq!(machine.cpu.registers.pc, 0xC001);
+        assert_eq!(machine.cpu.registers.sp, 0xFF06);
+    }
+
     fn assert_step(machine: &mut Machine, cycles: usize, opcode: Option<u8>) {
         let result = machine.step();
         assert_eq!(result.cycles, cycles);
