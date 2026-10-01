@@ -184,8 +184,9 @@ per M-cycle for 160 M-cycles.
 CPU OAM reads, including opcode fetches, return `FF` while DMA is active; CPU OAM
 writes are ignored. DMA uses raw internal source reads and OAM writes so it does not
 block itself, while untimed inspection remains raw. A write to `FF46` during an active
-transfer updates readback but does not yet schedule the replacement source; restart
-timing and DMG source-page aliases remain future work.
+transfer updates readback immediately. The old source continues for that write M-cycle
+and the following M-cycle, with no accessible gap, then the replacement starts a fresh
+160-M-cycle transfer. DMG source-page aliases remain future work.
 
 ## Display (PPU)
 

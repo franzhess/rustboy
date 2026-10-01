@@ -14,8 +14,20 @@ const OAM_DMA_STARTUP_M_CYCLES: u8 = 2;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OamDmaState {
     Inactive,
-    Starting { source: u16, remaining_mcycles: u8 },
-    Active { source: u16, offset: usize },
+    Starting {
+        source: u16,
+        remaining_mcycles: u8,
+    },
+    Active {
+        source: u16,
+        offset: usize,
+    },
+    Restarting {
+        old_source: u16,
+        old_offset: usize,
+        replacement_source: u16,
+        remaining_mcycles: u8,
+    },
     Finishing,
 }
 
@@ -164,12 +176,27 @@ impl Mmu {
     }
 
     fn start_oam_dma(&mut self, value: u8) {
-        if !self.oam_dma_active() {
-            self.oam_dma_state = OamDmaState::Starting {
-                source: u16::from(value) << 8,
+        let source = u16::from(value) << 8;
+        self.oam_dma_state = match self.oam_dma_state {
+            OamDmaState::Active {
+                source: old_source,
+                offset: old_offset,
+            }
+            | OamDmaState::Restarting {
+                old_source,
+                old_offset,
+                ..
+            } => OamDmaState::Restarting {
+                old_source,
+                old_offset,
+                replacement_source: source,
                 remaining_mcycles: OAM_DMA_STARTUP_M_CYCLES,
-            };
-        }
+            },
+            _ => OamDmaState::Starting {
+                source,
+                remaining_mcycles: OAM_DMA_STARTUP_M_CYCLES,
+            },
+        };
     }
 
     fn advance_oam_dma(&mut self) {
@@ -187,8 +214,7 @@ impl Mmu {
                 remaining_mcycles: remaining_mcycles - 1,
             },
             OamDmaState::Active { source, offset } => {
-                let value = self.read_byte(source.wrapping_add(offset as u16));
-                self.ppu.write_byte(0xFE00 + offset as u16, value);
+                self.transfer_oam_dma_byte(source, offset);
                 if offset + 1 == OAM_SIZE {
                     OamDmaState::Finishing
                 } else {
@@ -198,12 +224,43 @@ impl Mmu {
                     }
                 }
             }
+            OamDmaState::Restarting {
+                old_source,
+                old_offset,
+                replacement_source,
+                remaining_mcycles,
+            } => {
+                if old_offset < OAM_SIZE {
+                    self.transfer_oam_dma_byte(old_source, old_offset);
+                }
+                if remaining_mcycles == 1 {
+                    OamDmaState::Active {
+                        source: replacement_source,
+                        offset: 0,
+                    }
+                } else {
+                    OamDmaState::Restarting {
+                        old_source,
+                        old_offset: old_offset.saturating_add(1),
+                        replacement_source,
+                        remaining_mcycles: remaining_mcycles - 1,
+                    }
+                }
+            }
             OamDmaState::Finishing => OamDmaState::Inactive,
         };
     }
 
+    fn transfer_oam_dma_byte(&mut self, source: u16, offset: usize) {
+        let value = self.read_byte(source.wrapping_add(offset as u16));
+        self.ppu.write_byte(0xFE00 + offset as u16, value);
+    }
+
     fn oam_dma_active(&self) -> bool {
-        matches!(self.oam_dma_state, OamDmaState::Active { .. })
+        matches!(
+            self.oam_dma_state,
+            OamDmaState::Active { .. } | OamDmaState::Restarting { .. }
+        )
     }
 }
 
@@ -276,6 +333,42 @@ mod tests {
         assert_eq!(mmu.read_byte(0xFE9F), 0xA0);
         assert_eq!(mmu.read_cpu_byte(0xFE00), 1);
         assert_eq!(mmu.read_byte(0xFF46), 0xC0);
+        assert_eq!(mmu.oam_dma_state, OamDmaState::Finishing);
+    }
+
+    #[test]
+    fn active_dma_restart_keeps_blocking_and_resets_the_transfer_deadline() {
+        let mut mmu = mmu_without_lcd();
+        for offset in 0..OAM_SIZE {
+            mmu.write_byte(0xC000 + offset as u16, 0x11);
+            mmu.write_byte(0xD000 + offset as u16, 0x22);
+        }
+
+        mmu.write_cpu_byte(0xFF46, 0xC0);
+        mmu.do_ticks(12); // Startup, then the old transfer's first byte.
+        mmu.write_cpu_byte(0xFF46, 0xD0);
+        assert_eq!(mmu.read_byte(0xFF46), 0xD0);
+
+        mmu.do_ticks(4); // Restart write M-cycle; old DMA continues.
+        assert_eq!(mmu.read_byte(0xFE01), 0x11);
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.do_ticks(4); // Following M-cycle; replacement becomes active.
+        assert!(matches!(
+            mmu.oam_dma_state,
+            OamDmaState::Active {
+                source: 0xD000,
+                offset: 0
+            }
+        ));
+        assert_eq!(mmu.read_byte(0xFE02), 0x11);
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+
+        mmu.do_ticks(4); // First replacement byte.
+        assert_eq!(mmu.read_byte(0xFE00), 0x22);
+        mmu.do_ticks((OAM_SIZE - 2) * 4);
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.do_ticks(4); // Final replacement byte.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0x22);
         assert_eq!(mmu.oam_dma_state, OamDmaState::Finishing);
     }
 

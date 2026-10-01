@@ -1,5 +1,17 @@
 # ROM conformance baseline
 
+## OAM DMA restart timing — 2026-09-30
+
+Writing `FF46` during active OAM DMA now starts a two-M-cycle replacement delay.
+The old transfer continues during both M-cycles, OAM remains continuously blocked,
+and the replacement source then begins a fresh 160-M-cycle transfer at offset zero.
+Repeated writes replace the pending source and reset its activation deadline.
+
+`acceptance/oam_dma_restart` now passes without regressions. The eligible Mooneye
+acceptance result is **42/62**, with **24/29** direct tests passing. All direct DMA
+timing tests now pass; `acceptance/oam_dma/sources-GS` remains deferred to source-page
+alias handling.
+
 ## Fresh OAM DMA timing — 2026-09-30
 
 OAM DMA now has a two-M-cycle startup followed by 160 one-byte transfer M-cycles.
