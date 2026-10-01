@@ -22,13 +22,13 @@ impl<'a> CpuBus<'a> {
 
     pub(super) fn read_byte(&mut self, address: u16) -> u8 {
         let value = self.mmu.read_cpu_byte(address);
-        self.idle_mcycle();
+        self.advance_mcycle();
         value
     }
 
     pub(super) fn write_byte(&mut self, address: u16, value: u8) {
         self.mmu.write_cpu_byte(address, value);
-        self.idle_mcycle();
+        self.advance_mcycle();
     }
 
     pub(super) fn write_word(&mut self, address: u16, value: u16) {
@@ -40,6 +40,10 @@ impl<'a> CpuBus<'a> {
         self.mmu.read_byte(address)
     }
 
+    pub(super) fn internal_mcycle(&mut self) {
+        self.advance_mcycle();
+    }
+
     pub(super) fn finish(&mut self, total_cycles: usize) {
         assert!(
             self.elapsed_cycles <= total_cycles,
@@ -47,11 +51,11 @@ impl<'a> CpuBus<'a> {
             self.elapsed_cycles
         );
         while self.elapsed_cycles < total_cycles {
-            self.idle_mcycle();
+            self.internal_mcycle();
         }
     }
 
-    fn idle_mcycle(&mut self) {
+    fn advance_mcycle(&mut self) {
         self.advance(M_CYCLE_T_CYCLES);
     }
 

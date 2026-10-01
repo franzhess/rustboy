@@ -228,9 +228,10 @@ operands, 12 for BIT `(HL)`, and 16 for other `(HL)` operations.
   return address. `return_from_call` restores PC by popping the stack; it is used
   by `RET`, taken conditional returns, and `RETI`. The `RETI` handler also enables
   IME immediately.
-- The stack grows downward: push subtracts two from SP and writes a little-endian
-  word; pop reads the word and adds two. These are aggregate operations, not a
-  model of the hardware's individual stack-write bus phases.
+- The stack grows downward. PUSH, RST, and CALL use a leading internal M-cycle,
+  decrement SP and write the high byte, then decrement SP and write the low byte.
+  POP reads the low and high bytes on separate M-cycles, incrementing SP after each.
+  Interrupt entry retains its separate, instruction-batched stack implementation.
 
 For conditional JR/JP/CALL/RET, Z and C determine whether the branch is taken.
 Both paths consume their instruction operands, but their durations differ.
@@ -263,9 +264,9 @@ Multi-byte reads and writes therefore occupy separate operations. Opcode handler
 fill any remaining duration with internal M-cycles.
 
 This seam does not make execution cycle-perfect. Several instructions still place
-their unspecialized internal cycles at the end, stack writes retain their existing
-order, and interrupt entry remains a single 20-T-cycle batch. Register-update phases
-are not independently scheduled.
+their unspecialized internal cycles at the end, conditional RET is not fully phased,
+and interrupt entry remains a single 20-T-cycle batch. Register-update phases are not
+independently scheduled.
 
 ## Interrupts
 

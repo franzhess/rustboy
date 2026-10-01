@@ -26,8 +26,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   their four-T-cycle operation, then devices advance through that operation. Remaining duration
   is filled with internal M-cycles. Multi-byte reads and writes are separate bus operations.
 - The model is not cycle-perfect: several instructions still place internal cycles at the end,
-  stack-write order is not yet corrected, register updates are not independently phased, and
-  interrupt entry still advances as one 20-T-cycle batch.
+  register updates are not independently phased, and interrupt entry still advances as one
+  20-T-cycle batch. Normal PUSH, RST, and CALL stack writes are phased high byte then low byte.
 - The timer advances its divider one T-cycle at a time inside each M-cycle to preserve selected-bit
   falling edges. TIMA reload-cycle write priority and some HALT edges still need finer ordering.
 

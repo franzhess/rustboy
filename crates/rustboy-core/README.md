@@ -27,7 +27,7 @@ Frontends map emulated T-cycles to real time. The desktop application targets 4,
 
 Rustboy is **T-cycle-accounted** with an **M-cycle CPU bus seam**, but it is not cycle-perfect. Normal instruction reads and writes consume individual four-T-cycle bus operations, and handlers fill their remaining duration with internal M-cycles. Components such as the timer still process individual T-cycle edges inside each operation.
 
-Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Interrupt entry also remains an instruction-sized batch. TIMA reload-cycle write priority, stack-write order, DMA arbitration, interrupt-entry ordering, and some HALT edges therefore need additional scheduling work.
+Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Normal PUSH, RST, and CALL stack writes are phased; interrupt entry remains an instruction-sized batch. TIMA reload-cycle write priority, conditional-return timing, interrupt-entry ordering, and some HALT edges therefore need additional scheduling work.
 
 ## The Game Boy machine
 

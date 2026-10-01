@@ -1,5 +1,15 @@
 # ROM conformance baseline
 
+## PUSH, RST, and CALL stack writes — 2026-09-30
+
+Normal CPU pushes now use an internal M-cycle followed by separate high-byte and
+low-byte stack writes, decrementing SP before each write. PUSH, RST, and taken CALL
+share this sequence; interrupt entry remains separately instruction-batched.
+
+`acceptance/push_timing`, `rst_timing`, `call_timing2`, and `call_cc_timing2` now
+pass without regressions. The eligible Mooneye acceptance result is **46/62**, with
+**28/29** direct tests passing. `ret_cc_timing` is the remaining direct failure.
+
 ## OAM DMA restart timing — 2026-09-30
 
 Writing `FF46` during active OAM DMA now starts a two-M-cycle replacement delay.

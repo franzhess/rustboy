@@ -197,8 +197,11 @@ impl Cpu {
     }
 
     fn push(&mut self, value: u16, bus: &mut CpuBus<'_>) {
-        self.registers.sp = self.registers.sp.wrapping_sub(2); //stack grows down from 0xFFFE and stores words
-        bus.write_word(self.registers.sp, value);
+        bus.internal_mcycle();
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        bus.write_byte(self.registers.sp, (value >> 8) as u8);
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        bus.write_byte(self.registers.sp, value as u8);
     }
 
     fn pop(&mut self, bus: &mut CpuBus<'_>) -> u16 {
@@ -299,6 +302,24 @@ mod tests {
         // through 256, so the following high-byte read observes one.
         assert_eq!(machine.cpu.registers.get_bc(), 0x01FF);
         assert_eq!(machine.cpu.registers.sp, 0xFF05);
+    }
+
+    #[test]
+    fn push_writes_its_low_byte_during_the_final_mcycle() {
+        let mut machine = machine_with_program(&[0xC5, 0x00]); // PUSH BC; NOP
+        machine.cpu.registers.set_bc(0x12C0);
+        machine.cpu.registers.sp = 0xFF48;
+        machine.mmu.write_byte(0xC000, 0x42);
+        machine.mmu.write_byte(0xFE00, 0x11);
+
+        assert_step(&mut machine, 16, Some(0xC5));
+
+        assert_eq!(machine.cpu.registers.sp, 0xFF46);
+        assert_eq!(machine.mmu.read_byte(0xFF46), 0xC0);
+        assert_eq!(machine.mmu.read_cpu_byte(0xFE00), 0x11);
+
+        assert_step(&mut machine, 4, Some(0x00));
+        assert_eq!(machine.mmu.read_cpu_byte(0xFE00), 0xFF);
     }
 
     fn assert_step(machine: &mut Machine, cycles: usize, opcode: Option<u8>) {
