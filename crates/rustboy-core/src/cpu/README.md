@@ -231,7 +231,7 @@ operands, 12 for BIT `(HL)`, and 16 for other `(HL)` operations.
 - The stack grows downward. PUSH, RST, and CALL use a leading internal M-cycle,
   decrement SP and write the high byte, then decrement SP and write the low byte.
   POP reads the low and high bytes on separate M-cycles, incrementing SP after each.
-  Interrupt entry retains its separate, instruction-batched stack implementation.
+  Interrupt entry uses a separate five-M-cycle high-then-low stack sequence.
 
 For conditional JR/JP/CALL/RET, Z and C determine whether the branch is taken.
 Both paths consume their instruction operands, but their durations differ.
@@ -264,8 +264,8 @@ Multi-byte reads and writes therefore occupy separate operations. Opcode handler
 fill any remaining duration with internal M-cycles.
 
 This seam does not make execution cycle-perfect. Several instructions still place
-their unspecialized internal cycles at the end, and interrupt entry remains a single
-20-T-cycle batch. Register-update phases are not independently scheduled.
+their unspecialized internal cycles at the end, and register-update phases are not
+independently scheduled.
 
 ## Interrupts
 
@@ -285,9 +285,13 @@ IF, so other pending requests survive until serviced or cleared by software.
 | 3 | Serial | `0058` |
 | 4 | Joypad | `0060` |
 
-The lowest numbered pending bit wins (`trailing_zeros` identifies it). Entry
-clears IME and a pending EI enable, saves PC, acknowledges that IF bit, and jumps
-to `0x40 + 8 * interrupt_number`. It consumes **20 T-cycles**. The handler's first
+Entry clears IME and a pending EI enable, then consumes five M-cycles: two internal
+cycles, a high PC-byte stack write, a low PC-byte stack write, and a final internal
+cycle. Enabled requests are sampled again after the high-byte write. The lowest
+numbered remaining bit wins; if none remain, dispatch is cancelled and PC becomes
+zero without acknowledging IF. The selection is latched before the low-byte write,
+so an IE change there is too late to cancel entry. Successful entry acknowledges the
+selected IF bit and jumps to `0x40 + 8 * interrupt_number`. The handler's first
 instruction executes on the next step. Serial and joypad vectors are recognized,
 but the MMU does not yet forward their device requests into IF.
 

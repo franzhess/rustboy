@@ -19,7 +19,7 @@ The single-file modules are covered below: [MMU](#memory-bus-mmu),
 
 The original Game Boy is synchronized by a 4,194,304 Hz master clock. A **T-cycle** is one tick of that clock and is the smallest timing unit used by the core. CPU instructions take a multiple of four T-cycles; four T-cycles make one CPU **M-cycle** (machine cycle).
 
-The CPU, timer, PPU, and APU advance from the same T-cycle count. During normal instructions, `Cpu::tick` advances devices through CPU bus accesses and internal M-cycles. Interrupt entry still advances its 20 T-cycles as one batch, while idle steps advance four T-cycles. This ties device progress to CPU execution rather than the host computer's wall clock. STOP and illegal-opcode idle currently use the same timing approximation.
+The CPU, timer, PPU, and APU advance from the same T-cycle count. During normal instructions, `Cpu::tick` advances devices through CPU bus accesses and internal M-cycles. Interrupt entry advances as five explicit M-cycles, while idle steps advance four T-cycles. This ties device progress to CPU execution rather than the host computer's wall clock. STOP and illegal-opcode idle currently use the same timing approximation.
 
 Frontends map emulated T-cycles to real time. The desktop application targets 4,194,304 T-cycles per nominal second using 60 time slices, carrying fractional cycles and instruction overshoot between slices. It sleeps only for the unused portion of each host time slice; these slices are independent of PPU video frames. The APU uses a fractional sample clock so that 4,194,304 emulated T-cycles produce exactly 48,000 audio output frames per second, despite that ratio not being an integer.
 
@@ -27,7 +27,7 @@ Frontends map emulated T-cycles to real time. The desktop application targets 4,
 
 Rustboy is **T-cycle-accounted** with an **M-cycle CPU bus seam**, but it is not cycle-perfect. Normal instruction reads and writes consume individual four-T-cycle bus operations, and handlers fill their remaining duration with internal M-cycles. Components such as the timer still process individual T-cycle edges inside each operation.
 
-Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Normal PUSH, RST, and CALL stack writes and all return-family reads are phased; interrupt entry remains an instruction-sized batch. TIMA reload-cycle write priority, interrupt-entry ordering, and some HALT edges therefore need additional scheduling work.
+Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Normal PUSH, RST, and CALL stack writes, all return-family reads, and interrupt-entry stack writes are phased. TIMA reload-cycle write priority and some HALT edges therefore need additional scheduling work.
 
 ## The Game Boy machine
 

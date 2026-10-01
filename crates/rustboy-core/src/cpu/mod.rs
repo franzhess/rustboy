@@ -68,13 +68,10 @@ impl Cpu {
     }
 
     /// Executes one CPU step. Instructions advance devices through their bus and
-    /// internal M-cycles; interrupt entry and idle states retain their existing
-    /// instruction-sized timing until their phase ordering is modeled separately.
+    /// internal M-cycles; interrupt entry advances its five hardware M-cycles
+    /// explicitly, while idle states advance one M-cycle.
     pub fn tick(&mut self, mmu: &mut Mmu) -> CpuStepResult {
         if self.handle_irq(mmu) {
-            // Interrupt entry is a five-M-cycle hardware sequence: acknowledge IF, push the
-            // current PC, and load the vector. Devices continue running for all 20 T-cycles.
-            mmu.do_ticks(20);
             CpuStepResult {
                 cycles: 20,
                 opcode: None,
@@ -125,9 +122,7 @@ impl Cpu {
     }
 
     fn handle_irq(&mut self, mmu: &mut Mmu) -> bool {
-        let irq_requested = mmu.read_byte(0xFF0F);
-        let irq = self.pending_interrupts(mmu);
-        if irq == 0 {
+        if self.pending_interrupts(mmu) == 0 {
             return false;
         }
 
@@ -141,7 +136,6 @@ impl Cpu {
 
         self.ime = false;
         self.ei_requested = 0;
-        let irq_num = irq.trailing_zeros(); //0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
 
         if self.halt_bug {
             // EI; HALT with an already pending interrupt returns to HALT. The suppressed
@@ -149,10 +143,31 @@ impl Cpu {
             self.registers.pc = self.registers.pc.wrapping_sub(1);
             self.halt_bug = false;
         }
-        self.registers.sp = self.registers.sp.wrapping_sub(2);
-        mmu.write_word(self.registers.sp, self.registers.pc);
-        self.registers.pc = (0x0040 + 8 * irq_num) as u16;
-        mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));
+
+        mmu.do_ticks(4);
+        mmu.do_ticks(4);
+
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        mmu.write_cpu_byte(self.registers.sp, (self.registers.pc >> 8) as u8);
+        mmu.do_ticks(4);
+
+        // IE may have changed if the high stack byte landed at FFFF. Hardware
+        // finalizes the interrupt selection here, before writing the low byte.
+        let irq_requested = mmu.read_byte(0xFF0F);
+        let irq = self.pending_interrupts(mmu);
+
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
+        mmu.write_cpu_byte(self.registers.sp, self.registers.pc as u8);
+        mmu.do_ticks(4);
+
+        if irq == 0 {
+            self.registers.pc = 0;
+        } else {
+            let irq_num = irq.trailing_zeros(); // 0 vblank, 1 stat, 2 timer, 3 serial, 4 joypad
+            self.registers.pc = (0x0040 + 8 * irq_num) as u16;
+            mmu.write_byte(0xFF0F, irq_requested & !(1 << irq_num));
+        }
+        mmu.do_ticks(4);
         true
     }
 
@@ -555,6 +570,54 @@ mod tests {
         assert_eq!(result.opcode, Some(0x00));
         assert_eq!(machine.cpu.registers.pc, 0x0041);
         assert_eq!(machine.cpu.registers.sp, 0xFFFC);
+    }
+
+    #[test]
+    fn interrupt_high_stack_write_can_cancel_or_reprioritize_entry() {
+        let mut cancelled = machine_with_rom(Vec::new());
+        cancelled.cpu.registers.pc = 0x0235;
+        cancelled.cpu.registers.sp = 0;
+        cancelled.cpu.ime = true;
+        cancelled.mmu.write_byte(0xFFFF, 0x04);
+        cancelled.mmu.write_byte(0xFF0F, 0x04);
+
+        assert_step(&mut cancelled, 20, None);
+
+        assert_eq!(cancelled.cpu.registers.pc, 0);
+        assert_eq!(cancelled.cpu.registers.sp, 0xFFFE);
+        assert_eq!(cancelled.mmu.read_byte(0xFFFF), 0x02);
+        assert_eq!(cancelled.mmu.read_byte(0xFFFE), 0x35);
+        assert_eq!(cancelled.mmu.read_byte(0xFF0F) & 0x1F, 0x04);
+        assert!(!cancelled.cpu.ime);
+
+        let mut reprioritized = machine_with_rom(Vec::new());
+        reprioritized.cpu.registers.pc = 0x0235;
+        reprioritized.cpu.registers.sp = 0;
+        reprioritized.cpu.ime = true;
+        reprioritized.mmu.write_byte(0xFFFF, 0x03);
+        reprioritized.mmu.write_byte(0xFF0F, 0x03);
+
+        assert_step(&mut reprioritized, 20, None);
+
+        assert_eq!(reprioritized.cpu.registers.pc, 0x0048);
+        assert_eq!(reprioritized.mmu.read_byte(0xFF0F) & 0x1F, 0x01);
+    }
+
+    #[test]
+    fn interrupt_low_stack_write_is_too_late_to_cancel_entry() {
+        let mut machine = machine_with_rom(Vec::new());
+        machine.cpu.registers.pc = 0x1235;
+        machine.cpu.registers.sp = 1;
+        machine.cpu.ime = true;
+        machine.mmu.write_byte(0xFFFF, 0x08);
+        machine.mmu.write_byte(0xFF0F, 0x08);
+
+        assert_step(&mut machine, 20, None);
+
+        assert_eq!(machine.cpu.registers.pc, 0x0058);
+        assert_eq!(machine.cpu.registers.sp, 0xFFFF);
+        assert_eq!(machine.mmu.read_byte(0xFFFF), 0x35);
+        assert_eq!(machine.mmu.read_byte(0xFF0F) & 0x1F, 0);
     }
 
     #[test]

@@ -26,8 +26,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   their four-T-cycle operation, then devices advance through that operation. Remaining duration
   is filled with internal M-cycles. Multi-byte reads and writes are separate bus operations.
 - The model is not cycle-perfect: several instructions still place internal cycles at the end,
-  register updates are not independently phased, and interrupt entry still advances as one
-  20-T-cycle batch. Normal PUSH, RST, and CALL stack writes are phased high byte then low byte.
+  and register updates are not independently phased. Normal PUSH, RST, CALL, and interrupt-entry
+  stack writes are phased high byte then low byte.
 - The timer advances its divider one T-cycle at a time inside each M-cycle to preserve selected-bit
   falling edges. TIMA reload-cycle write priority and some HALT edges still need finer ordering.
 
@@ -47,12 +47,14 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 ## Interrupt Notes
 
 - Interrupt entry consumes 20 T-cycles without executing a handler instruction in that step.
-  It clears IME, acknowledges the highest-priority enabled request, and saves the return PC.
+  It uses two internal M-cycles, writes PC high then low, and finishes with one internal M-cycle.
+- The enabled request is selected after the high-byte write. An IE change there can cancel or
+  reprioritize dispatch; the selection is latched before the low-byte write. Cancellation sets
+  PC to zero without acknowledging IF. Successful entry acknowledges the selected request.
 - Execution tracing and ROM exit-opcode detection use the opcode returned by `Machine::step`,
   not the speculative `next_opcode` peek.
-- Mooneye `acceptance/intr_timing` and `acceptance/reti_intr_timing` pass.
-  `acceptance/interrupts/ie_push` still fails; interrupt dispatch does not yet model changes
-  to IE during the stack writes of the interrupt-entry sequence.
+- Mooneye `acceptance/intr_timing`, `acceptance/reti_intr_timing`, and
+  `acceptance/interrupts/ie_push` pass.
 
 ## DMA Notes
 

@@ -133,6 +133,7 @@ impl Mmu {
         }
     }
 
+    #[cfg(test)]
     pub fn write_word(&mut self, address: u16, value: u16) {
         self.write_byte(address, (value & 0x00FF) as u8); //LSB first
         self.write_byte(address.wrapping_add(1), ((value & 0xFF00) >> 8) as u8);

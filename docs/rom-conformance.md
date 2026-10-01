@@ -1,5 +1,17 @@
 # ROM conformance baseline
 
+## Interrupt-entry stack phases — 2026-09-30
+
+Interrupt entry now advances five explicit M-cycles: two internal cycles, high and
+low PC-byte stack writes, and a final internal cycle. Enabled requests are selected
+after the high-byte write, allowing a write to IE there to cancel or reprioritize
+dispatch. The selection is latched before the low-byte write, which is too late to
+cancel entry. Cancellation leaves IF unchanged and sets PC to zero.
+
+`acceptance/interrupts/ie_push` now passes together with `intr_timing` and
+`reti_intr_timing`. The eligible Mooneye acceptance result is **48/62**; the
+`acceptance/interrupts/` subfolder is **1/1**.
+
 ## Conditional RET timing — 2026-09-30
 
 Taken conditional RET now performs its leading internal M-cycle before the low and
