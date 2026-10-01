@@ -1,5 +1,15 @@
 # ROM conformance baseline
 
+## OAM DMA source aliases — 2026-09-30
+
+DMG OAM DMA source addresses in `E000–FFFF` now alias `C000–DFFF`. The translation
+is applied only to DMA-internal reads, so CPU and untimed inspection accesses retain
+the ordinary OAM, unusable, IO, and HRAM mappings in the upper address range.
+
+`acceptance/oam_dma/sources-GS` now passes without regressions. All six eligible DMA
+acceptance tests pass, the `acceptance/oam_dma/` subfolder is **3/3**, and the full
+eligible Mooneye acceptance result is **49/62**.
+
 ## Interrupt-entry stack phases — 2026-09-30
 
 Interrupt entry now advances five explicit M-cycles: two internal cycles, high and

@@ -64,8 +64,10 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   DMA-internal accesses and untimed inspection bypass this CPU gate.
 - Active-transfer `FF46` writes update readback immediately. The old transfer remains active
   through the replacement's two-M-cycle startup, then the replacement begins at offset zero.
-- Mooneye `oam_dma_start`, `oam_dma_timing`, `oam_dma_restart`, `oam_dma/basic`, and
-  `oam_dma/reg_read` pass. `oam_dma/sources-GS` still fails pending DMG source-page aliases.
+- DMA-internal source pages `E0..=FF` alias `C0..=DF`; ordinary CPU accesses do not use
+  this alias.
+- Mooneye `oam_dma_start`, `oam_dma_timing`, `oam_dma_restart`, `oam_dma/basic`,
+  `oam_dma/reg_read`, and `oam_dma/sources-GS` pass.
 
 ## EI and HALT Notes
 

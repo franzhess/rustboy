@@ -253,7 +253,12 @@ impl Mmu {
     }
 
     fn transfer_oam_dma_byte(&mut self, source: u16, offset: usize) {
-        let value = self.read_byte(source.wrapping_add(offset as u16));
+        let source_address = source.wrapping_add(offset as u16);
+        let source_address = match source_address {
+            0xE000..=0xFFFF => source_address - 0x2000,
+            _ => source_address,
+        };
+        let value = self.read_byte(source_address);
         self.ppu.write_byte(0xFE00 + offset as u16, value);
     }
 
@@ -371,6 +376,28 @@ mod tests {
         mmu.do_ticks(4); // Final replacement byte.
         assert_eq!(mmu.read_cpu_byte(0xFE00), 0x22);
         assert_eq!(mmu.oam_dma_state, OamDmaState::Finishing);
+    }
+
+    #[test]
+    fn dma_upper_source_pages_alias_wram_without_changing_cpu_mapping() {
+        let mut mmu = mmu_without_lcd();
+        mmu.write_byte(0xDE00, 0x42);
+        mmu.write_byte(0xFE00, 0x11);
+
+        mmu.write_cpu_byte(0xFF46, 0xFE);
+        mmu.do_ticks((2 + OAM_SIZE) * 4);
+
+        assert_eq!(mmu.read_byte(0xFE00), 0x42);
+        assert_eq!(mmu.read_byte(0xFF46), 0xFE);
+
+        mmu.write_byte(0xDF80, 0x24);
+        mmu.write_byte(0xFF80, 0x99);
+        mmu.write_cpu_byte(0xFF46, 0xFF);
+        mmu.do_ticks((2 + OAM_SIZE) * 4);
+
+        assert_eq!(mmu.read_byte(0xFE80), 0x24);
+        assert_eq!(mmu.read_byte(0xFF80), 0x99);
+        assert_eq!(mmu.read_byte(0xFF46), 0xFF);
     }
 
     #[test]
