@@ -88,12 +88,10 @@ impl Mmu {
     }
 
     pub(crate) fn read_cpu_byte(&self, address: u16) -> u8 {
-        if (0xFE00..=0xFE9F).contains(&address)
-            && (self.oam_dma_active() || !self.ppu.cpu_can_access_oam())
-        {
-            0xFF
-        } else {
-            self.read_byte(address)
+        match address {
+            0x8000..=0x9FFF if !self.ppu.cpu_can_read_vram() => 0xFF,
+            0xFE00..=0xFE9F if self.oam_dma_active() || !self.ppu.cpu_can_read_oam() => 0xFF,
+            _ => self.read_byte(address),
         }
     }
 
@@ -130,10 +128,10 @@ impl Mmu {
     }
 
     pub(crate) fn write_cpu_byte(&mut self, address: u16, value: u8) {
-        if !(0xFE00..=0xFE9F).contains(&address)
-            || (!self.oam_dma_active() && self.ppu.cpu_can_access_oam())
-        {
-            self.write_byte(address, value);
+        match address {
+            0x8000..=0x9FFF if !self.ppu.cpu_can_write_vram() => {}
+            0xFE00..=0xFE9F if self.oam_dma_active() || !self.ppu.cpu_can_write_oam() => {}
+            _ => self.write_byte(address, value),
         }
     }
 
@@ -317,6 +315,37 @@ mod tests {
         assert_eq!(mmu.read_cpu_byte(0xFE00), 0x11);
         mmu.write_cpu_byte(0xFE00, 0x22);
         assert_eq!(mmu.read_byte(0xFE00), 0x22);
+    }
+
+    #[test]
+    fn lcd_restart_gates_cpu_video_memory_at_dmg_edges() {
+        let mut mmu = mmu_without_lcd();
+        mmu.write_byte(0xFE00, 0x11);
+        mmu.write_byte(0x8000, 0x33);
+        mmu.write_byte(0xFF40, 0x80);
+
+        mmu.do_ticks(80); // First line enters mode 3 directly.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        assert_eq!(mmu.read_cpu_byte(0x8000), 0xFF);
+        mmu.write_cpu_byte(0xFE00, 0x22);
+        mmu.write_cpu_byte(0x8000, 0x44);
+        assert_eq!((mmu.read_byte(0xFE00), mmu.read_byte(0x8000)), (0x11, 0x33));
+
+        mmu.do_ticks(372); // LY advances four dots before line 1 mode 2.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        assert_eq!(mmu.read_cpu_byte(0x8000), 0x33);
+        mmu.write_cpu_byte(0xFE00, 0x22);
+        assert_eq!(mmu.read_byte(0xFE00), 0x22);
+
+        mmu.do_ticks(4 + 76); // Final four dots of mode 2 allow an OAM write.
+        assert_eq!(mmu.read_cpu_byte(0xFE00), 0xFF);
+        mmu.write_cpu_byte(0xFE00, 0x55);
+        assert_eq!(mmu.read_byte(0xFE00), 0x55);
+
+        mmu.do_ticks(4); // Mode 3 blocks both memories again.
+        mmu.write_cpu_byte(0xFE00, 0x66);
+        mmu.write_cpu_byte(0x8000, 0x77);
+        assert_eq!((mmu.read_byte(0xFE00), mmu.read_byte(0x8000)), (0x55, 0x33));
     }
 
     #[test]

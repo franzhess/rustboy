@@ -7,6 +7,8 @@ pub const OAM_SIZE: usize = 0xA0; // 40 sprites * 4 attribute bytes.
 const DOTS_PER_LINE: usize = 456;
 const OAM_SEARCH_END: usize = 80;
 const PIXEL_TRANSFER_END: usize = 252;
+const LY_ADVANCE_DOT: usize = 452;
+const OAM_WRITE_ACCESS_DOT: usize = 76;
 const VISIBLE_LINES: u8 = 144;
 const TOTAL_LINES: u8 = 154;
 
@@ -30,6 +32,10 @@ pub struct Ppu {
     frame: Option<Frame>,
 
     clock: usize,
+    lcd_startup: bool,
+    lcd_restart_timing: bool,
+    ly_advanced: bool,
+    lyc_rise_pending: bool,
     vram: [u8; VRAM_SIZE],
     oam: [u8; OAM_SIZE],
     lcd_enabled: bool,               //FF40
@@ -70,6 +76,10 @@ impl Ppu {
             irq_stat: false,
             stat_line: false,
             clock: 0, // for the first line
+            lcd_startup: false,
+            lcd_restart_timing: false,
+            ly_advanced: false,
+            lyc_rise_pending: false,
             vram: [0; VRAM_SIZE],
             oam: [0; OAM_SIZE],
             lcd_enabled: true,
@@ -170,7 +180,22 @@ impl Ppu {
                 self.sprite_enable = value & 0x02 == 0x02;
                 self.bg_window_priority = value & 0x01 == 0x01;
                 if self.lcd_enabled && !was_enabled {
+                    self.clock = 0;
+                    self.line = 0;
+                    self.mode = PpuMode::HBlank;
+                    self.lcd_startup = true;
+                    self.lcd_restart_timing = true;
+                    self.ly_advanced = false;
+                    self.lyc_rise_pending = false;
                     self.lyc_equal = self.line == self.line_compare;
+                } else if !self.lcd_enabled && was_enabled {
+                    self.clock = 0;
+                    self.line = 0;
+                    self.mode = PpuMode::HBlank;
+                    self.lcd_startup = false;
+                    self.lcd_restart_timing = false;
+                    self.ly_advanced = false;
+                    self.lyc_rise_pending = false;
                 }
                 self.update_stat_line();
             }
@@ -187,6 +212,7 @@ impl Ppu {
                 self.line_compare = value;
                 if self.lcd_enabled {
                     self.lyc_equal = self.line == self.line_compare;
+                    self.lyc_rise_pending = false;
                 }
                 self.update_stat_line();
             }
@@ -194,6 +220,7 @@ impl Ppu {
                 self.line = 0;
                 if self.lcd_enabled {
                     self.lyc_equal = self.line == self.line_compare;
+                    self.lyc_rise_pending = false;
                 }
                 self.update_stat_line();
             }
@@ -231,8 +258,31 @@ impl Ppu {
         std::mem::take(&mut self.irq_stat)
     }
 
-    pub(crate) fn cpu_can_access_oam(&self) -> bool {
-        !self.lcd_enabled || matches!(self.mode, PpuMode::HBlank | PpuMode::VBlank)
+    pub(crate) fn cpu_can_read_oam(&self) -> bool {
+        !self.lcd_enabled
+            || (matches!(self.mode, PpuMode::HBlank | PpuMode::VBlank)
+                && !(self.lcd_restart_timing && self.ly_advanced && self.line < VISIBLE_LINES))
+    }
+
+    pub(crate) fn cpu_can_write_oam(&self) -> bool {
+        !self.lcd_enabled
+            || matches!(self.mode, PpuMode::HBlank | PpuMode::VBlank)
+            || (self.lcd_restart_timing
+                && self.mode == PpuMode::OamSearch
+                && self.clock >= OAM_WRITE_ACCESS_DOT)
+    }
+
+    pub(crate) fn cpu_can_read_vram(&self) -> bool {
+        !self.lcd_enabled
+            || (self.mode != PpuMode::PixelTransfer
+                && !(self.lcd_restart_timing
+                    && !self.lcd_startup
+                    && self.mode == PpuMode::OamSearch
+                    && self.clock >= OAM_WRITE_ACCESS_DOT))
+    }
+
+    pub(crate) fn cpu_can_write_vram(&self) -> bool {
+        !self.lcd_enabled || self.mode != PpuMode::PixelTransfer
     }
 
     /* timing
@@ -245,23 +295,24 @@ impl Ppu {
     pub fn do_ticks(&mut self, mut ticks: usize) {
         if !self.lcd_enabled {
             // Reset directly: LCD disable does not run HBlank entry effects.
+            self.clock = 0;
             self.line = 0;
             self.mode = PpuMode::HBlank;
             self.update_stat_line();
             return;
         }
 
-        if self.line < VISIBLE_LINES && self.clock < OAM_SEARCH_END {
+        if !self.lcd_startup && self.line < VISIBLE_LINES && self.clock < OAM_SEARCH_END {
             self.set_mode_if_changed(PpuMode::OamSearch);
         }
 
         while ticks > 0 {
-            let boundary = if self.line >= VISIBLE_LINES {
-                DOTS_PER_LINE
-            } else if self.clock < OAM_SEARCH_END {
+            let boundary = if self.line < VISIBLE_LINES && self.clock < OAM_SEARCH_END {
                 OAM_SEARCH_END
-            } else if self.clock < PIXEL_TRANSFER_END {
+            } else if self.line < VISIBLE_LINES && self.clock < PIXEL_TRANSFER_END {
                 PIXEL_TRANSFER_END
+            } else if self.lcd_restart_timing && !self.ly_advanced && self.clock < LY_ADVANCE_DOT {
+                LY_ADVANCE_DOT
             } else {
                 DOTS_PER_LINE
             };
@@ -276,17 +327,40 @@ impl Ppu {
             match boundary {
                 OAM_SEARCH_END => self.set_mode_if_changed(PpuMode::PixelTransfer),
                 PIXEL_TRANSFER_END => self.set_mode_if_changed(PpuMode::HBlank),
-                DOTS_PER_LINE => self.advance_line(),
+                LY_ADVANCE_DOT => self.advance_ly(),
+                DOTS_PER_LINE => self.finish_line(),
                 _ => unreachable!(),
             }
         }
     }
 
-    fn advance_line(&mut self) {
-        self.clock = 0;
+    fn advance_ly(&mut self) {
         self.line = (self.line + 1) % TOTAL_LINES;
-        self.lyc_equal = self.line == self.line_compare;
+        self.ly_advanced = true;
+        let equal = self.line == self.line_compare;
+        self.lyc_rise_pending = equal && !self.lyc_equal;
+        if !equal {
+            self.lyc_equal = false;
+        }
         self.update_stat_line();
+    }
+
+    fn finish_line(&mut self) {
+        self.clock = 0;
+        if self.ly_advanced {
+            self.ly_advanced = false;
+            if self.lyc_rise_pending {
+                self.lyc_equal = true;
+                self.lyc_rise_pending = false;
+                self.update_stat_line();
+            }
+        } else {
+            self.line = (self.line + 1) % TOTAL_LINES;
+            self.lyc_equal = self.line == self.line_compare;
+            self.lyc_rise_pending = false;
+            self.update_stat_line();
+        }
+        self.lcd_startup = false;
 
         if self.line == VISIBLE_LINES {
             self.set_mode_if_changed(PpuMode::VBlank);
@@ -568,16 +642,16 @@ mod test {
     #[test]
     fn cpu_oam_access_follows_mode_boundaries() {
         let mut ppu = Ppu::new();
-        assert!(ppu.cpu_can_access_oam());
+        assert!(ppu.cpu_can_read_oam());
 
         ppu.do_ticks(1);
-        assert!(!ppu.cpu_can_access_oam());
+        assert!(!ppu.cpu_can_read_oam());
         ppu.do_ticks(79);
         assert_eq!(ppu.mode, PpuMode::PixelTransfer);
-        assert!(!ppu.cpu_can_access_oam());
+        assert!(!ppu.cpu_can_read_oam());
         ppu.do_ticks(172);
         assert_eq!(ppu.mode, PpuMode::HBlank);
-        assert!(ppu.cpu_can_access_oam());
+        assert!(ppu.cpu_can_read_oam());
     }
 
     #[test]
@@ -589,6 +663,82 @@ mod test {
         assert_eq!(ppu.line, 1);
         assert_eq!(ppu.clock, OAM_SEARCH_END);
         assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+    }
+
+    #[test]
+    fn lcd_restart_uses_the_dmg_first_line_timeline() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF40, 0);
+        ppu.write_byte(0xFF40, 0x80);
+
+        assert_eq!((ppu.line, ppu.clock, ppu.mode), (0, 0, PpuMode::HBlank));
+        assert_eq!(ppu.read_byte(0xFF41) & 0x07, 0x04);
+        ppu.do_ticks(OAM_SEARCH_END);
+        assert_eq!(
+            (ppu.line, ppu.clock, ppu.mode),
+            (0, 80, PpuMode::PixelTransfer)
+        );
+        assert_eq!(ppu.read_byte(0xFF41) & 0x07, 0x07);
+        ppu.do_ticks(PIXEL_TRANSFER_END - OAM_SEARCH_END);
+        assert_eq!((ppu.line, ppu.clock, ppu.mode), (0, 252, PpuMode::HBlank));
+
+        ppu.do_ticks(LY_ADVANCE_DOT - PIXEL_TRANSFER_END);
+        assert_eq!((ppu.line, ppu.clock, ppu.mode), (1, 452, PpuMode::HBlank));
+        assert_eq!(ppu.read_byte(0xFF41) & 0x07, 0);
+        ppu.do_ticks(DOTS_PER_LINE - LY_ADVANCE_DOT);
+        assert_eq!((ppu.line, ppu.clock, ppu.mode), (1, 0, PpuMode::OamSearch));
+        assert_eq!(ppu.read_byte(0xFF41) & 0x07, 0x02);
+
+        ppu.do_ticks(OAM_SEARCH_END);
+        assert_eq!(
+            (ppu.line, ppu.clock, ppu.mode),
+            (1, 80, PpuMode::PixelTransfer)
+        );
+        ppu.do_ticks(PIXEL_TRANSFER_END - OAM_SEARCH_END);
+        assert_eq!((ppu.line, ppu.clock, ppu.mode), (1, 252, PpuMode::HBlank));
+    }
+
+    #[test]
+    fn lcd_restart_exposes_the_dmg_oam_write_window() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF40, 0);
+        ppu.write_byte(0xFF40, 0x80);
+
+        ppu.do_ticks(LY_ADVANCE_DOT);
+        assert!(!ppu.cpu_can_read_oam());
+        assert!(ppu.cpu_can_write_oam());
+        assert!(ppu.cpu_can_read_vram());
+        assert!(ppu.cpu_can_write_vram());
+
+        ppu.do_ticks(DOTS_PER_LINE - LY_ADVANCE_DOT + OAM_WRITE_ACCESS_DOT);
+        assert_eq!(ppu.mode, PpuMode::OamSearch);
+        assert!(!ppu.cpu_can_read_oam());
+        assert!(ppu.cpu_can_write_oam());
+        assert!(!ppu.cpu_can_read_vram());
+        assert!(ppu.cpu_can_write_vram());
+
+        ppu.do_ticks(OAM_SEARCH_END - OAM_WRITE_ACCESS_DOT);
+        assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+        assert!(!ppu.cpu_can_read_oam());
+        assert!(!ppu.cpu_can_write_oam());
+        assert!(!ppu.cpu_can_read_vram());
+        assert!(!ppu.cpu_can_write_vram());
+    }
+
+    #[test]
+    fn lcd_restart_delays_a_rising_coincidence_until_mode_two() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF40, 0);
+        ppu.write_byte(0xFF45, 1);
+        ppu.write_byte(0xFF40, 0x80);
+
+        ppu.do_ticks(LY_ADVANCE_DOT);
+        assert_eq!((ppu.line, ppu.mode), (1, PpuMode::HBlank));
+        assert_eq!(ppu.read_byte(0xFF41) & 0x04, 0);
+
+        ppu.do_ticks(DOTS_PER_LINE - LY_ADVANCE_DOT);
+        assert_eq!(ppu.mode, PpuMode::OamSearch);
+        assert_eq!(ppu.read_byte(0xFF41) & 0x04, 0x04);
     }
 
     #[test]

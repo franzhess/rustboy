@@ -1,5 +1,22 @@
 # ROM conformance baseline
 
+## DMG LCD restart timing — 2026-10-02
+
+Enabling LCDC now starts the DMG-specific first line in mode 0, enters mode 3 at
+dot 80 without a mode-2 phase, and enters HBlank at dot 252. LY advances at dot
+452; the following line enters mode 2 four dots later. A rising LY=LYC result is
+latched with that mode-2 transition, while a falling result clears at the LY edge.
+
+CPU VRAM and OAM reads and writes now use their distinct restart access windows.
+Mode 3 blocks both memories, OAM reads lock at the early LY edge, and the last four
+dots of mode 2 allow OAM writes while already blocking VRAM reads. Raw rendering,
+DMA, and untimed inspection accesses continue to bypass CPU gates.
+
+`acceptance/ppu/lcdon_timing-GS`, `lcdon_write_timing-GS`, and `stat_lyc_onoff`
+now pass without regressions. The PPU subfolder is **10/12**, and the full eligible
+Mooneye acceptance result is **58/62**. The two remaining PPU failures require
+SCX- and sprite-dependent mode-3 duration.
+
 ## Combined PPU STAT interrupt line — 2026-10-01
 
 The four enabled STAT sources now feed one level signal, and the PPU requests a STAT

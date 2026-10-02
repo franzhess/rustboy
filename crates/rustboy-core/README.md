@@ -237,19 +237,26 @@ VBlank publishes a frame and requests the separate VBlank interrupt.
 The current initial mode is HBlank even though LCDC starts enabled; the first device
 tick enters OAM search. Visible lines enter pixel transfer at dot 80, HBlank at dot
 252, and the next line at dot 456. Tick batches process every crossed boundary in
-order. CPU OAM reads return `FF` and writes are ignored during OAM search and pixel
-transfer; raw PPU and DMA accesses bypass this CPU restriction. Disabling the LCD
-resets LY and the mode to HBlank on the next device tick without running HBlank-entry
-effects. Mode 3 still has a fixed 172-dot duration; SCX and sprite-fetch penalties
-and LCD startup timing are not yet modeled.
+order. Disabling the LCD immediately resets LY, the dot clock, and the mode to HBlank
+without running HBlank-entry effects.
+
+Restarting the DMG LCD uses a distinct first line: mode 0 lasts through dot 79, mode
+3 begins directly at dot 80, HBlank begins at dot 252, LY advances at dot 452, and
+line 1 enters mode 2 at dot 456. On restarted lines, a rising coincidence result is
+latched with mode 2 four dots after LY advances; a falling result clears immediately.
+CPU VRAM and OAM reads and writes have distinct gates around these edges, including
+a final four-dot mode-2 window where OAM writes pass while VRAM reads are blocked.
+Raw PPU, DMA, and untimed inspection accesses bypass CPU restrictions.
+
+Mode 3 still has a fixed 172-dot duration; SCX and sprite-fetch penalties are not yet
+modeled.
 
 Run the PPU tests with `cargo test -p rustboy-core ppu::`.
 
-Mode selection is evaluated at step boundaries using fixed thresholds, not a pixel
-FIFO. Sprite/scroll-dependent transfer durations and exact STAT edge behavior are
-not fully modeled. VRAM/OAM access restrictions are not enforced. The renderer
-supports background tiles and basic sprites with flipping, palettes, and clipping,
-but `render_window` is still a stub and the ten-sprites-per-line limit is not implemented.
+Mode selection uses fixed thresholds rather than a pixel FIFO. Sprite/scroll-dependent
+transfer durations are not fully modeled. The renderer supports background tiles and
+basic sprites with flipping, palettes, and clipping, but `render_window` is still a
+stub and the ten-sprites-per-line limit is not implemented.
 
 ## Timer
 

@@ -94,12 +94,14 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 
 - Visible lines use fixed boundaries: mode 2 at dot 0, mode 3 at dot 80, HBlank at dot 252,
   and the next line at dot 456. Batched ticks process every crossed boundary in order.
-- CPU OAM reads return `FF` and writes are ignored in modes 2 and 3. DMA and untimed internal
-  accesses bypass this gate.
+- CPU OAM reads return `FF` and writes are ignored in modes 2 and 3, apart from the
+  restart-specific final mode-2 write window. DMA and untimed internal accesses bypass this gate.
 - STAT sources use one combined level signal and request an interrupt only on its rising edge.
   LY=LYC is latched while LCD is off, and the DMG mode-2 source also rises at VBlank entry.
-- Mooneye `acceptance/ppu` passes 7 of 12 tests. `stat_lyc_onoff` still needs the LCD
-  startup state; other remaining work covers startup/write timing and variable mode-3
+- LCD restart begins line 0 in mode 0, enters mode 3 directly at dot 80, advances LY at
+  dot 452, and enters line 1 mode 2 at dot 456. Restart access edges distinguish OAM/VRAM
+  reads and writes, including the final four dots of mode 2.
+- Mooneye `acceptance/ppu` passes 10 of 12 tests. Remaining work is variable mode-3
   duration from SCX and sprite fetches.
 
 ## Testing
