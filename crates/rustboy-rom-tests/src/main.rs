@@ -178,6 +178,13 @@ fn cycle_budget(suite: &str, name: &str, exit: &ExitCondition) -> usize {
     {
         seconds = seconds.max(30.0);
     }
+    // This exhaustive sprite-position matrix runs for just under four emulated seconds.
+    if exit.opcode.is_some()
+        && suite == "mooneye-test-suite"
+        && name == "acceptance/ppu/intr_2_mode0_timing_sprites"
+    {
+        seconds = seconds.max(5.0);
+    }
     (seconds * CPU_FREQUENCY as f64) as usize
 }
 
@@ -360,6 +367,25 @@ mod tests {
             assert_eq!(
                 cycle_budget("mooneye-test-suite", "emulator-only/mbc1/ram_64kb", &exit),
                 seconds * CPU_FREQUENCY
+            );
+        }
+    }
+
+    #[test]
+    fn sprite_timing_matrix_has_a_five_second_floor() {
+        for time in [None, Some(2.0), Some(5.0), Some(8.0)] {
+            let exit = ExitCondition {
+                opcode: Some(0x40),
+                time,
+            };
+            let expected_seconds = if time == Some(8.0) { 8 } else { 5 };
+            assert_eq!(
+                cycle_budget(
+                    "mooneye-test-suite",
+                    "acceptance/ppu/intr_2_mode0_timing_sprites",
+                    &exit,
+                ),
+                expected_seconds * CPU_FREQUENCY
             );
         }
     }

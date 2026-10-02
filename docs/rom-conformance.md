@@ -1,5 +1,25 @@
 # ROM conformance baseline
 
+## Variable PPU mode-3 timing — 2026-10-02
+
+Visible lines now latch their HBlank start when mode 3 begins. The base 172-dot
+transfer includes the `SCX & 7` fine-scroll delay and fetch penalties for the first
+ten OAM-order sprites overlapping the line. Selected sprites are processed in X
+order; each contributes a six-dot fetch, with one alignment cost per fetch tile.
+The sprite subtotal is exposed at the core's current M-cycle CPU-observation
+granularity rather than through a pixel FIFO.
+
+Ordinary visible lines now publish their LY increment at dot 452 and retain mode 0
+until the next line enters mode 2 at dot 456, matching the restart timeline's LY
+edge. The exhaustive sprite-position ROM runs for nearly four emulated seconds, so
+the runner gives its opcode exit a five-second floor instead of the manifest's
+two-second deadline.
+
+`acceptance/ppu/hblank_ly_scx_timing-GS` and
+`intr_2_mode0_timing_sprites` now pass without regressions. The PPU subfolder is
+**12/12**, and the full eligible Mooneye acceptance result is **60/62**. Only
+`timer/tima_write_reloading` and `timer/tma_write_reloading` remain.
+
 ## DMG LCD restart timing — 2026-10-02
 
 Enabling LCDC now starts the DMG-specific first line in mode 0, enters mode 3 at

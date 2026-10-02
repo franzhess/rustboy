@@ -32,6 +32,7 @@ pub struct Ppu {
     frame: Option<Frame>,
 
     clock: usize,
+    pixel_transfer_end: usize,
     lcd_startup: bool,
     lcd_restart_timing: bool,
     ly_advanced: bool,
@@ -76,6 +77,7 @@ impl Ppu {
             irq_stat: false,
             stat_line: false,
             clock: 0, // for the first line
+            pixel_transfer_end: PIXEL_TRANSFER_END,
             lcd_startup: false,
             lcd_restart_timing: false,
             ly_advanced: false,
@@ -309,9 +311,9 @@ impl Ppu {
         while ticks > 0 {
             let boundary = if self.line < VISIBLE_LINES && self.clock < OAM_SEARCH_END {
                 OAM_SEARCH_END
-            } else if self.line < VISIBLE_LINES && self.clock < PIXEL_TRANSFER_END {
-                PIXEL_TRANSFER_END
-            } else if self.lcd_restart_timing && !self.ly_advanced && self.clock < LY_ADVANCE_DOT {
+            } else if self.line < VISIBLE_LINES && self.clock < self.pixel_transfer_end {
+                self.pixel_transfer_end
+            } else if !self.ly_advanced && self.clock < LY_ADVANCE_DOT {
                 LY_ADVANCE_DOT
             } else {
                 DOTS_PER_LINE
@@ -324,14 +326,59 @@ impl Ppu {
                 continue;
             }
 
-            match boundary {
-                OAM_SEARCH_END => self.set_mode_if_changed(PpuMode::PixelTransfer),
-                PIXEL_TRANSFER_END => self.set_mode_if_changed(PpuMode::HBlank),
-                LY_ADVANCE_DOT => self.advance_ly(),
-                DOTS_PER_LINE => self.finish_line(),
-                _ => unreachable!(),
+            if boundary == OAM_SEARCH_END {
+                self.pixel_transfer_end = PIXEL_TRANSFER_END + self.pixel_transfer_penalty();
+                self.set_mode_if_changed(PpuMode::PixelTransfer);
+            } else if boundary == self.pixel_transfer_end {
+                self.set_mode_if_changed(PpuMode::HBlank);
+            } else if boundary == LY_ADVANCE_DOT {
+                self.advance_ly();
+            } else if boundary == DOTS_PER_LINE {
+                self.finish_line();
+            } else {
+                unreachable!();
             }
         }
+    }
+
+    fn pixel_transfer_penalty(&self) -> usize {
+        let fine_scroll = usize::from(self.scroll_x & 7);
+        if !self.sprite_enable {
+            return fine_scroll;
+        }
+
+        let line_y = u16::from(self.line) + 16;
+        let mut sprite_x = [0; 10];
+        let mut sprite_count = 0;
+        for sprite in self.oam.chunks_exact(4) {
+            let y = u16::from(sprite[0]);
+            if line_y >= y && line_y < y + self.sprite_size as u16 {
+                sprite_x[sprite_count] = sprite[1];
+                sprite_count += 1;
+                if sprite_count == sprite_x.len() {
+                    break;
+                }
+            }
+        }
+        sprite_x[..sprite_count].sort_unstable();
+
+        let mut seen_tiles = [false; 22];
+        let mut sprite_penalty = 0;
+        for x in sprite_x[..sprite_count].iter().copied() {
+            if x >= 168 {
+                continue;
+            }
+
+            let shifted_x = usize::from(x) + fine_scroll;
+            let tile = shifted_x / 8;
+            if !seen_tiles[tile] {
+                let pixel_offset = if x == 0 { 0 } else { shifted_x % 8 };
+                sprite_penalty += 5usize.saturating_sub(pixel_offset);
+                seen_tiles[tile] = true;
+            }
+            sprite_penalty += 6;
+        }
+        fine_scroll + sprite_penalty / 4 * 4
     }
 
     fn advance_ly(&mut self) {
@@ -553,8 +600,10 @@ mod test {
             (1, 3, 0), // Dot 80.
             (171, 3, 0),
             (1, 0, 0), // Dot 252.
-            (203, 0, 0),
-            (1, 2, 1), // Dot 456, next line.
+            (199, 0, 0),
+            (1, 0, 1), // LY advances at dot 452.
+            (3, 0, 1),
+            (1, 2, 1), // The next line enters mode 2 at dot 456.
         ] {
             ppu.do_ticks(ticks);
             assert_eq!(ppu.read_byte(0xFF41) & 3, expected_mode);
@@ -663,6 +712,47 @@ mod test {
         assert_eq!(ppu.line, 1);
         assert_eq!(ppu.clock, OAM_SEARCH_END);
         assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+    }
+
+    #[test]
+    fn scx_and_sprite_fetches_extend_mode_three() {
+        let mut ppu = Ppu::new();
+        ppu.write_byte(0xFF43, 7);
+        ppu.sprite_enable = true;
+        ppu.oam[0] = 16;
+        ppu.oam[1] = 0;
+
+        ppu.do_ticks(OAM_SEARCH_END);
+        assert_eq!(ppu.pixel_transfer_end, PIXEL_TRANSFER_END + 7 + 8);
+        ppu.do_ticks(PIXEL_TRANSFER_END - OAM_SEARCH_END);
+        assert_eq!(ppu.mode, PpuMode::PixelTransfer);
+        ppu.do_ticks(15);
+        assert_eq!(ppu.mode, PpuMode::HBlank);
+    }
+
+    #[test]
+    fn sprite_penalties_follow_fetch_tiles_not_oam_order() {
+        fn penalty(xs: &[u8]) -> usize {
+            let mut ppu = Ppu::new();
+            ppu.line = 66;
+            ppu.sprite_enable = true;
+            for (sprite, x) in ppu.oam.chunks_exact_mut(4).zip(xs.iter().copied()) {
+                sprite[0] = 82;
+                sprite[1] = x;
+            }
+            ppu.pixel_transfer_penalty()
+        }
+
+        assert_eq!(penalty(&[0]), 8);
+        assert_eq!(penalty(&[1]), 8);
+        assert_eq!(penalty(&[4]), 4);
+        assert_eq!(penalty(&[5]), 4);
+        assert_eq!(penalty(&[168]), 0);
+        assert_eq!(penalty(&[0; 10]), 64);
+        assert_eq!(penalty(&[1; 10]), 64);
+        assert_eq!(penalty(&[0, 8]), 20);
+        assert_eq!(penalty(&[8, 0]), 20);
+        assert_eq!(penalty(&[0, 8, 16, 24, 32, 40, 48, 56, 64, 72]), 108);
     }
 
     #[test]

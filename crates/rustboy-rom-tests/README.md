@@ -18,9 +18,11 @@ Set `RUSTBOY_TEST_ROMS` to use a different checkout location.
 Opcode-based Mooneye `emulator-only/mbc1`, `mbc2`, and `mbc5` tests get at least
 30 seconds of emulated CPU time so exhaustive register sweeps can finish. The runner
 stops immediately when the exit opcode executes and preserves longer metadata limits.
-Other tests use their metadata limit (or the five-second default). Time-only tests
-always retain their specified assertion time. These budgets count CPU T-cycles, not
-host wall-clock time.
+The exhaustive `acceptance/ppu/intr_2_mode0_timing_sprites` matrix gets a five-second
+floor because it runs for nearly four emulated seconds despite its two-second metadata
+limit. Other tests use their metadata limit (or the five-second default). Time-only
+tests always retain their specified assertion time. These budgets count CPU T-cycles,
+not host wall-clock time.
 
 ## How it runs without SDL
 

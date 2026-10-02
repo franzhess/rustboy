@@ -92,8 +92,9 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 
 ## PPU Notes
 
-- Visible lines use fixed boundaries: mode 2 at dot 0, mode 3 at dot 80, HBlank at dot 252,
-  and the next line at dot 456. Batched ticks process every crossed boundary in order.
+- Visible lines enter mode 2 at dot 0 and mode 3 at dot 80. HBlank starts at dot 252 plus
+  the latched SCX and sprite-fetch penalties; LY advances at dot 452, and the next line
+  enters mode 2 at dot 456. Batched ticks process every crossed boundary in order.
 - CPU OAM reads return `FF` and writes are ignored in modes 2 and 3, apart from the
   restart-specific final mode-2 write window. DMA and untimed internal accesses bypass this gate.
 - STAT sources use one combined level signal and request an interrupt only on its rising edge.
@@ -101,8 +102,11 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - LCD restart begins line 0 in mode 0, enters mode 3 directly at dot 80, advances LY at
   dot 452, and enters line 1 mode 2 at dot 456. Restart access edges distinguish OAM/VRAM
   reads and writes, including the final four dots of mode 2.
-- Mooneye `acceptance/ppu` passes 10 of 12 tests. Remaining work is variable mode-3
-  duration from SCX and sprite fetches.
+- Mode-3 duration includes `SCX & 7` and penalties for the first ten OAM-order sprites
+  overlapping the line, processed in X order. This is a threshold model, not a pixel FIFO;
+  its sprite subtotal is quantized to complete CPU M-cycles.
+- All 12 Mooneye `acceptance/ppu` tests pass. The full eligible acceptance baseline is
+  60 of 62; only the two reload-cycle timer-write tests remain.
 
 ## Testing
 

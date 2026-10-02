@@ -36,7 +36,7 @@ A Game Boy program is a ROM cartridge containing instructions and game data. The
 - **CPU**: fetches and executes the Game Boy's 8-bit instruction set. Instructions take a known number of clock cycles, which drives all other devices.
 - **MMU**: the memory management unit routes each address to the appropriate device. For example, `0x8000..=0x9FFF` is video memory, while `0xFF00` is the joypad register.
 - **Cartridge and MBC**: ROMs can be larger than the CPU's directly addressable cartridge window. Memory bank controllers switch ROM and save-RAM banks as games write controller registers.
-- **PPU**: the picture processing unit reads video RAM, tile maps, palettes, and sprite data to produce the Game Boy's 160 by 144 pixel frame. The current implementation uses a simplified scanline/mode schedule for display-related interrupts.
+- **PPU**: the picture processing unit reads video RAM, tile maps, palettes, and sprite data to produce the Game Boy's 160 by 144 pixel frame. The current implementation uses a threshold-based scanline/mode schedule for display-related interrupts.
 - **APU**: the audio processing unit combines two square-wave channels, a programmable wave channel, and a noise channel. It produces stereo sample buffers from the same CPU-cycle clock.
 - **Timer**: maintains the divider and programmable timer registers used by games for timing, music, and interrupts.
 - **Joypad**: presents button presses through `FF00` and records a local interrupt request; forwarding that request to the CPU is not implemented yet.
@@ -219,8 +219,8 @@ The nominal frame schedule is 456 T-cycles per line, with 144 visible lines and
 | STAT mode bits | `PpuMode` | Nominal role in the current simplified schedule |
 | --- | --- | --- |
 | 2 | `OamSearch` | OAM search, first 80 T-cycles of a visible line |
-| 3 | `PixelTransfer` | Pixel transfer, next 172 T-cycles; the implementation renders the whole line on entry |
-| 0 | `HBlank` | HBlank, remaining 204 T-cycles |
+| 3 | `PixelTransfer` | Pixel transfer, at least 172 T-cycles; the implementation renders the whole line on entry |
+| 0 | `HBlank` | HBlank, from the transfer end through the rest of the visible line |
 | 1 | `VBlank` | VBlank, lines 144–153; entering it publishes a frame and requests VBlank |
 
 The mode is stored as a `PpuMode` enum, whose explicit discriminants encode STAT
@@ -235,10 +235,11 @@ Mode-entry effects use an exhaustive match: pixel transfer renders a line, while
 VBlank publishes a frame and requests the separate VBlank interrupt.
 
 The current initial mode is HBlank even though LCDC starts enabled; the first device
-tick enters OAM search. Visible lines enter pixel transfer at dot 80, HBlank at dot
-252, and the next line at dot 456. Tick batches process every crossed boundary in
-order. Disabling the LCD immediately resets LY, the dot clock, and the mode to HBlank
-without running HBlank-entry effects.
+tick enters OAM search. Visible lines enter pixel transfer at dot 80, enter HBlank at
+a per-line latched transfer end, advance LY at dot 452, and enter the next line's mode
+2 at dot 456. Tick batches process every crossed boundary in order. Disabling the LCD
+immediately resets LY, the dot clock, and the mode to HBlank without running
+HBlank-entry effects.
 
 Restarting the DMG LCD uses a distinct first line: mode 0 lasts through dot 79, mode
 3 begins directly at dot 80, HBlank begins at dot 252, LY advances at dot 452, and
@@ -248,15 +249,20 @@ CPU VRAM and OAM reads and writes have distinct gates around these edges, includ
 a final four-dot mode-2 window where OAM writes pass while VRAM reads are blocked.
 Raw PPU, DMA, and untimed inspection accesses bypass CPU restrictions.
 
-Mode 3 still has a fixed 172-dot duration; SCX and sprite-fetch penalties are not yet
-modeled.
+Mode 3 starts with a 172-dot duration and adds `SCX & 7`. When sprites are enabled,
+OAM search selects the first ten entries overlapping the line, then processes those
+entries in X order. Each visible selected sprite contributes a six-dot fetch cost;
+the first fetch in each shifted tile also contributes its alignment cost. The sprite
+subtotal is rounded down to a complete CPU M-cycle because this threshold model does
+not implement the pixel FIFO's sub-M-cycle fetch phases.
 
 Run the PPU tests with `cargo test -p rustboy-core ppu::`.
 
-Mode selection uses fixed thresholds rather than a pixel FIFO. Sprite/scroll-dependent
-transfer durations are not fully modeled. The renderer supports background tiles and
-basic sprites with flipping, palettes, and clipping, but `render_window` is still a
-stub and the ten-sprites-per-line limit is not implemented.
+Mode selection uses per-line thresholds rather than a pixel FIFO. SCX and basic
+sprite-fetch delays affect transfer duration, but window and detailed fetch-conflict
+timing are not modeled. The renderer supports background tiles and basic sprites with
+flipping, palettes, and clipping, but `render_window` is still a stub and rendering
+does not yet apply the timing model's ten-sprites-per-line selection limit.
 
 ## Timer
 
