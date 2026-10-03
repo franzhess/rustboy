@@ -365,9 +365,9 @@ operations, HL auto-update, conditional branch outcomes, stack pairs, RST vector
 high-memory/absolute loads, accumulator operations, STOP and read-only ALU memory
 access. These complement the exhaustive ALU tests and the existing EI/HALT tests.
 
-Known remaining boundaries include reload-cycle TIMA/TMA write priority and IE
-changes during interrupt-entry stack writes, which need finer bus scheduling.
-Some HALT/interrupt ROMs still fail or time out. See the
+Known remaining boundaries include internal instruction phases and register updates
+that are still coarser than the hardware timeline. Some HALT/interrupt ROMs outside
+the generic-DMG acceptance set still fail or time out. See the
 [conformance notes](../../../../docs/rom-conformance.md) for recorded results.
 
 References: [opcode tables](https://gbdev.io/gb-opcodes/optables/),

@@ -29,7 +29,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
   and register updates are not independently phased. Normal PUSH, RST, CALL, and interrupt-entry
   stack writes are phased high byte then low byte.
 - The timer advances its divider one T-cycle at a time inside each M-cycle to preserve selected-bit
-  falling edges. TIMA reload-cycle write priority and some HALT edges still need finer ordering.
+  falling edges. It tracks the overflow delay and reload cycle separately; some HALT edges still
+  need finer ordering.
 
 ## Timer Notes
 
@@ -40,9 +41,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - TIMA overflow exposes zero, then reloads from TMA and requests an interrupt four T-cycles later.
   Writing TIMA during the pending delay cancels the reload and interrupt; writing TMA changes
   the value used by the reload. Disabling TAC does not cancel a pending reload.
-- Mooneye `acceptance/timer` passes 11 of 13 tests, including `tima_reload`.
-  `tima_write_reloading` and `tma_write_reloading` still fail: reload-cycle write priority
-  requires CPU M-cycle scheduling and corresponding timer reload-cycle handling.
+- During the reload cycle, TIMA writes are ignored and TMA writes update both TMA and TIMA.
+- All 13 Mooneye `acceptance/timer` tests pass.
 
 ## Interrupt Notes
 
@@ -105,8 +105,8 @@ Keep emulation behavior in `rustboy-core`; adapters translate host I/O at the bo
 - Mode-3 duration includes `SCX & 7` and penalties for the first ten OAM-order sprites
   overlapping the line, processed in X order. This is a threshold model, not a pixel FIFO;
   its sprite subtotal is quantized to complete CPU M-cycles.
-- All 12 Mooneye `acceptance/ppu` tests pass. The full eligible acceptance baseline is
-  60 of 62; only the two reload-cycle timer-write tests remain.
+- All 12 Mooneye `acceptance/ppu` tests pass.
+- All 62 generic-DMG Mooneye acceptance tests selected by the runner pass.
 
 ## Testing
 

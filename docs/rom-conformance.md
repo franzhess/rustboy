@@ -1,5 +1,17 @@
 # ROM conformance baseline
 
+## Timer reload-cycle priority — 2026-10-03
+
+The timer now represents the four-T-cycle overflow delay and the following reload
+cycle as distinct phases. CPU writes before the reload retain the existing behavior:
+writing TIMA cancels a pending reload, while writing TMA changes the value that will
+be loaded. During the reload cycle, hardware priority ignores TIMA writes and makes
+a TMA write update both TMA and TIMA.
+
+`acceptance/timer/tima_write_reloading` and `tma_write_reloading` now pass without
+regressions. The timer subfolder is **13/13**, and all **62/62** generic-DMG Mooneye
+acceptance tests selected by the runner pass.
+
 ## Variable PPU mode-3 timing — 2026-10-02
 
 Visible lines now latch their HBlank start when mode 3 begins. The base 172-dot

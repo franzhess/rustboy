@@ -27,7 +27,7 @@ Frontends map emulated T-cycles to real time. The desktop application targets 4,
 
 Rustboy is **T-cycle-accounted** with an **M-cycle CPU bus seam**, but it is not cycle-perfect. Normal instruction reads and writes consume individual four-T-cycle bus operations, and handlers fill their remaining duration with internal M-cycles. Components such as the timer still process individual T-cycle edges inside each operation.
 
-Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Normal PUSH, RST, and CALL stack writes, all return-family reads, and interrupt-entry stack writes are phased. TIMA reload-cycle write priority and some HALT edges therefore need additional scheduling work.
+Multi-byte reads are observable as separate bus operations, but not every instruction places its internal cycles or register updates at the final hardware phase yet. Normal PUSH, RST, and CALL stack writes, all return-family reads, and interrupt-entry stack writes are phased. Timer-register writes observe reload-cycle priority through this bus seam, while some HALT edges still need additional scheduling work.
 
 ## The Game Boy machine
 
@@ -291,8 +291,9 @@ edges even when the CPU advances by a whole instruction.
 Overflow exposes zero for four T-cycles, then reloads TIMA from TMA and requests
 the timer interrupt. A TIMA write during the pending delay cancels the reload and
 request; a TMA write changes the reload value. Disabling TAC does not cancel a
-pending reload. Exact write priority on the reload cycle remains limited by the
-CPU's instruction-sized bus scheduling.
+pending reload. The timer tracks the following reload cycle separately: TIMA writes
+are ignored during it, while TMA writes update both TMA and the value visible in
+TIMA.
 
 ## Joypad
 

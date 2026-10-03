@@ -8,6 +8,7 @@ pub struct Timer {
     timer_enabled: bool,
     timer_bit: u8,
     reload_delay: Option<u8>,
+    reload_cycle_ticks: u8,
 }
 
 impl Timer {
@@ -22,6 +23,7 @@ impl Timer {
             timer_enabled: false,
             timer_bit: 7,
             reload_delay: None,
+            reload_cycle_ticks: 0,
         }
     }
 
@@ -56,14 +58,17 @@ impl Timer {
                 self.increment_on_falling_edge(previous_signal);
             }
             0xFF05 => {
-                // Instructions currently perform their write before advancing their aggregate
-                // T-cycles. In that ordering, a TIMA write while a reload is pending occurs
-                // before the transfer and cancels it. Reload-cycle bus priority needs CPU
-                // M-cycle scheduling, which is deliberately kept outside this timer commit.
-                self.reload_delay = None;
-                self.timer_counter = value;
+                if self.reload_delay != Some(1) && self.reload_cycle_ticks == 0 {
+                    self.reload_delay = None;
+                    self.timer_counter = value;
+                }
             }
-            0xFF06 => self.timer_modulo = value,
+            0xFF06 => {
+                self.timer_modulo = value;
+                if self.reload_cycle_ticks > 0 {
+                    self.timer_counter = value;
+                }
+            }
             0xFF07 => {
                 // TAC changes the timer's input multiplexer immediately. A transition from the
                 // old selected signal to the new one is indistinguishable from a divider edge.
@@ -87,7 +92,7 @@ impl Timer {
         // The CPU advances devices in instruction-sized batches. Stepping the divider one
         // T-cycle at a time preserves every selected-bit edge within those batches.
         for _ in 0..ticks {
-            self.advance_reload_delay();
+            self.advance_reload_state();
 
             let previous_signal = self.timer_signal();
             self.divider = self.divider.wrapping_add(1);
@@ -117,7 +122,12 @@ impl Timer {
         }
     }
 
-    fn advance_reload_delay(&mut self) {
+    fn advance_reload_state(&mut self) {
+        if self.reload_cycle_ticks > 0 {
+            self.reload_cycle_ticks -= 1;
+            return;
+        }
+
         let Some(delay) = self.reload_delay else {
             return;
         };
@@ -128,6 +138,9 @@ impl Timer {
             self.timer_counter = self.timer_modulo;
             self.irq_timer = true;
             self.reload_delay = None;
+            // The transfer occupies this T-cycle and the remaining three T-cycles of the
+            // CPU M-cycle. TIMA writes lose priority throughout it; TMA writes update both.
+            self.reload_cycle_ticks = 3;
         } else {
             self.reload_delay = Some(delay - 1);
         }
@@ -240,6 +253,42 @@ mod tests {
 
         assert_eq!(timer.read_byte(0xFF05), 0xCD);
         assert!(timer.take_interrupt());
+    }
+
+    #[test]
+    fn writing_tima_on_the_reload_cycle_is_ignored() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+
+        timer.do_ticks(19);
+        timer.write_byte(0xFF05, 0x42);
+        timer.do_ticks(1);
+        assert_eq!(timer.read_byte(0xFF05), 0xAB);
+        assert!(timer.take_interrupt());
+
+        timer.write_byte(0xFF05, 0x55);
+        assert_eq!(timer.read_byte(0xFF05), 0xAB);
+        timer.do_ticks(3);
+        timer.write_byte(0xFF05, 0x66);
+        assert_eq!(timer.read_byte(0xFF05), 0x66);
+    }
+
+    #[test]
+    fn writing_tma_on_the_reload_cycle_updates_tima() {
+        let mut timer = timer_about_to_overflow();
+        timer.write_byte(0xFF06, 0xAB);
+
+        timer.do_ticks(19);
+        timer.write_byte(0xFF06, 0xCD);
+        timer.do_ticks(1);
+        assert_eq!(timer.read_byte(0xFF05), 0xCD);
+        assert!(timer.take_interrupt());
+
+        timer.write_byte(0xFF06, 0xEF);
+        assert_eq!(timer.read_byte(0xFF05), 0xEF);
+        timer.do_ticks(3);
+        timer.write_byte(0xFF06, 0x12);
+        assert_eq!(timer.read_byte(0xFF05), 0xEF);
     }
 
     #[test]
